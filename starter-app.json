@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "slug": "knowledge-nook",
+  "version": "0.1.0",
+  "needs": {
+    "connections": [
+      { "provider": "scrapecreators", "strength": "suggested", "why": "Read YouTube channels and their transcripts" }
+    ]
+  },
+  "ready": {
+    "service": "web"
+  },
+  "suggestions": [
+    {
+      "id": "add-a-channel",
+      "label": "Add a YouTube channel",
+      "prompt": "Turn this YouTube channel into a knowledge site: ",
+      "when": [{ "path": "sources", "is": "missing" }]
+    },
+    {
+      "id": "add-a-website",
+      "label": "Add a website",
+      "prompt": "Add this website to the knowledge site: ",
+      "when": [{ "path": "sources/sites.txt", "is": "missing" }]
+    },
+    {
+      "id": "where-does-it-stand",
+      "label": "Where does it stand?",
+      "prompt": "Where does the site stand: what has been read, what is still queued, and what needs me?",
+      "when": [{ "path": "pipeline/state.json", "is": "present" }]
+    },
+    {
+      "id": "tidy-the-topics",
+      "label": "Tidy the topics",
+      "prompt": "Tidy the topics and show me the tree.",
+      "when": [{ "path": "index/topics.md", "is": "present" }, { "path": "index/tree.md", "is": "missing" }]
+    },
+    {
+      "id": "write-the-pages",
+      "label": "Write the pages",
+      "prompt": "Write the pages for the topics that have enough sources. Tell me what it will cost first.",
+      "when": [{ "path": "index/topics.md", "is": "present" }, { "path": "content", "is": "missing" }]
+    },
+    {
+      "id": "deploy-to-production",
+      "label": "Deploy to production",
+      "prompt": "Check the site and deploy it to production.",
+      "when": [{ "path": "content", "is": "present" }]
+    },
+    {
+      "id": "ask-about-the-subject",
+      "label": "Ask about the subject",
+      "prompt": "What do the sources say about ",
+      "when": [{ "path": "index/topics.md", "is": "present" }]
+    }
+  ]
+}

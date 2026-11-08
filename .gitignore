@@ -1,0 +1,29 @@
+# Never commit credentials or local state. Task & Tool delivers env to a
+# machine at install time; nothing in this repo should ever hold a key.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Tool noise
+/dist/
+/.cache/
+node_modules/
+.DS_Store
+
+# Working knowledge is the owner's, made on their machine, never in this repo.
+/sources/
+/raw/
+/distilled/
+/moments/
+/index/
+/takes/
+/content/
+
+
+# Build output.
+/.dist.new/
+/static/site.css
+/pipeline/
+/log.md

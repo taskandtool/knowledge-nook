@@ -1,0 +1,36 @@
+/* The look, in one place: every colour, face and size the site uses. Tailwind's own
+   palette is off, so markup can only use these. To change the look, change them here. */
+@theme {
+  --color-*: initial;
+  --color-canvas: #f6f7f4;
+  --color-surface: #ffffff;
+  --color-panel: #e8ebe4;
+  --color-ink: #15191c;
+  --color-ink-2: #4c5459;
+  --color-ink-3: #5f676c;
+  --color-accent: #a8341a;
+  --color-accent-ink: #ffffff;
+  --color-tile: #203a35;
+  --color-tile-ink: #f3f6f1;
+  --color-line: rgb(21 25 28 / 0.14);
+  --color-line-strong: rgb(21 25 28 / 0.34);
+
+  --font-display: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Source Serif 4", ui-serif, Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --text-page: clamp(2.25rem, 5vw, 3.5rem);
+  --text-page--line-height: 1.04;
+  --text-title: clamp(1.4rem, 2.2vw, 1.75rem);
+  --text-title--line-height: 1.2;
+  --text-lede: clamp(1.15rem, 1.6vw, 1.35rem);
+  --text-lede--line-height: 1.45;
+  --text-copy: 1.125rem;
+  --text-copy--line-height: 1.65;
+  --text-small: 0.9375rem;
+  --text-small--line-height: 1.45;
+
+  --container-read: 44rem;
+  --container-wide: 76rem;
+  --radius-tile: 0.25rem;
+}
