@@ -1,6 +1,6 @@
 ---
 name: topics
-description: Tidies the site's topics after a batch of sources: merges names into the few real subjects a reader would look up, splits what's too big, and arranges a tree the owner can check. Use when asked to tidy or merge topics, or when index/topics.md reads like a mess.
+description: Tidies the site's topics: merges names into the few subjects a reader would look up, drops names that are no subject, splits a topic that answers separate questions, and arranges a tree the owner checks. Use when asked to tidy, merge or split topics, or when `pipeline.mjs next` hands you a batch.
 ---
 
 # Tidy the topics
@@ -9,10 +9,12 @@ The site's structure comes from this list. Done when `index/topics.md` reads lik
 
 Run `node scripts/build-index.mjs`, then read `SITE.md` and `index/topics.md`. Names come from moments, so most are one-offs.
 
-- **Merge hard.** In `index/aliases.yaml`, one `other name: name to keep` a line, send every one-off into the plainest real subject it belongs to. A site has dozens of topics, not hundreds. A name no reader would look up goes too. Open a topic file when you can't tell.
-- **Split what's huge.** A topic marked big enough to split is several: change the tags in `moments/` for the ones that belong under a narrower name. Nothing else there changes.
-- **A topic is something they have views on.** Two tests. As broad as the site: if it could be the site's title, it's the site, so it goes ("investing" on an investing site). How they talk, not what about: humor, stories, preaching style and tone aren't subjects ("humor in sermons"). Would they say "here's what I think about ___"? Move those moments to what they were actually about.
+- **Merge hard.** In `index/aliases.yaml`, one `other name: name to keep` a line (a chain resolves to its end, and the rebuild prints the result), send every one-off into the plainest real subject it belongs to. A site has dozens of topics, not hundreds. A name no reader would look up, or that fits no subject, is dropped: `humor: -`. Never merge into a topic it isn't about, and never merge away a topic that has a page: others merge into it. Open a topic file when you can't tell.
+- **Split by question, not size.** A topic is several when its moments answer questions a reader would look up apart: "how big a bet" and "when to sell" under investing. Retag those moments in `moments/` with the narrower name first and the old one after it (`position sizing, risk management`), so the old topic becomes the broader page; nothing else there changes. The same point told fifty times is one topic, and so are the caveats, disagreements and changes of mind on one question. "Big enough to split" only says look.
+- **A topic is something they have views on.** Two tests. As broad as the site: if it could be the site's title, it's the site, so it goes ("investing" on an investing site). How they talk, not what about: humor, stories, preaching style and tone aren't subjects ("humor in sermons"). Would they say "here's what I think about ___"? Drop those names; `build-index.mjs` says how many moments that leaves with no topic.
 - **Don't merge two ideas to make numbers.** A real idea with one source can wait under the gate.
 - **Tree:** `index/tree.md`, nested bullets from broad subjects down, each topic that passes the gate once. It's how pages get `broader` and `part_of`.
 
 Rebuild after editing. Topic files are built; never edit them. Then show the owner the tree and the topics that pass.
+
+**A batch.** When `pipeline.mjs next` hands you `pipeline/briefs/batch.md`, judge only what it lists, by the rules above. A new name joins a topic, is dropped, or stays a new idea under the gate; a big topic splits or stays whole. A kept name that passes the gate goes into `index/tree.md`, and a split-off one under the topic it came from. Say what you merged, dropped and split in one line.

@@ -5,7 +5,7 @@ description: Pans one source for its most colorful, accurate nuggets, each one s
 
 # Moments
 
-Pan for gold, and write as them. A nugget is what only this person would say: a strong take, a surprising claim, a number that lands, a story with a point, a move they made. Color is the job; a flat line is a failed line. Done when someone scanning the list wants to watch the video, and `node scripts/check-moments.mjs <file>` passes.
+Pan for gold, and write as them. A nugget is what only this person would say: a strong take, a surprising claim, a striking number, a story with a point, a move they made. Color is the job; a flat line is a failed line. Done when someone scanning the list wants to watch the video, and `node scripts/check-moments.mjs <file>` passes.
 
 Read `SITE.md`, then the whole source in ranges. If `distilled/<same path>` exists, read it too, but every moment comes from the transcript. Write `moments/<same path>`.
 
@@ -18,7 +18,7 @@ Read `SITE.md`, then the whole source in ranges. If `distilled/<same path>` exis
 - Two points stay two lines; don't fuse them for punch. A joke earns a line when it carries a point or shows who they are.
 - One line, one idea, at most 25 words, in their voice: "I paid $41 for my first share", never "he". Start with the point.
 - Time is the second of the caption where they say it, never a preview clip at the start. Highlights, not quotes: say the point, and use quote marks rarely, only for words too good to touch. A host's point opens with their name: `Lee: budgets fail.` A web page or document has no seconds, so its lines all read 00:00:00.
-- Topics are one or two short plain things they have views on, the same across sources: a topic in `index/topics.md` when one fits. A real subject, not this one point, not the site's whole subject, and not how they talk ("humor").
+- Topics are one or two short plain things they have views on, the one it's most about first, the same across sources: a topic in `index/topics.md` when one fits. A real subject, not this one point, not the site's whole subject, and not how they talk ("humor").
 - It averages one every 2 or 3 minutes. A dull stretch gets none, and a great one gets four.
 
 Flat: Everyday observations can reveal investment opportunities before the experts see them.

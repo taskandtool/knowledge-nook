@@ -13,7 +13,7 @@ stop: each run costs a full turn.
 1. **Citations.** Take about 20 links at random across pages. Open the transcript at that moment with
    `sed` and read a few minutes around it. Find: a point the source does not make, a host's point credited
    to a guest, certainty that changed, a change over time nobody claimed, a rule the writer made up, and a
-   link more than 3 minutes from the claim. Correct the page with the right `Link:` line. If the
+   link more than 3 minutes from the claim. Correct the page's link. If the
    distillation is at fault, say which one and redo it with the `distill` skill. A pattern across pages
    means the `write-page` skill needs fixing: put that in the deliverable.
 2. **Overlap.** Pages drifting onto the same ground: each point lives on the most specific page where it

@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildIndex, gateFrom, linkTo, momentsIn, parseAliases, parseDistilled, passesGate, slugOf, topicFile } from "../scripts/build-index.mjs";
+import { buildIndex, gateFrom, linkTo, momentsIn, parseAliases, parseDistilled, passesGate, reusedLinks, slugOf, toldOn, topicEntries, topicFile, topicHash } from "../scripts/build-index.mjs";
 
 const script = fileURLToPath(new URL("../scripts/build-index.mjs", import.meta.url));
 const run = (cwd, args = []) =>
@@ -87,6 +87,66 @@ test("a topic file holds each moment with its exact link, and the notes around i
   assert.equal(linkTo("https://a.b/c", "00:00:10"), "https://a.b/c", "only a video has a moment to open at");
 });
 
+test("a big topic keeps every moment, but only the notes that fit one read: its page's cited moments first, then the newest", () => {
+  const long = (w) => `${w} `.repeat(4000).trim();
+  const files = ["2020", "2021", "2022", "2023", "2024"].map((y, i) => ({ path: `moments/${y}.md`, text: moments({ title: `T${y}`, url: `https://youtube.com/watch?v=v${y}`, lines: [["00:01:00", "x", `Moment ${y}.`]] }), notes: notes(`${y}-01-01`, [["00:00:00", long(`n${y}`)]]) }));
+  const { ordered, relatedOf } = buildIndex(files, new Map());
+  const out = topicFile("x", ordered[0][1], relatedOf("x"), "A point. [1](https://youtube.com/watch?v=v2020&t=90s)\n");
+  for (const y of ["2020", "2021", "2022", "2023", "2024"]) assert.match(out, new RegExp(`Moment ${y}\\.`), "every moment stays");
+  assert.match(out, /n2020 /, "the cited moment keeps its notes, though oldest");
+  assert.match(out, /n2024 /);
+  assert.match(out, /n2023 /);
+  assert.doesNotMatch(out, /n2021 |n2022 /);
+  assert.match(out, /Every moment is here\. To fit one read, 2 older passages of notes are left out/);
+  assert.doesNotMatch(topicFile("x", buildIndex(files.slice(0, 2), new Map()).ordered[0][1], []), /left out/, "a small topic keeps all its notes");
+  const back = topicEntries(out);
+  assert.deepEqual(back.map((e) => e.id), files.map((f) => `${f.path}#00:01:00`));
+  assert.equal(back[4].link, "https://youtube.com/watch?v=v2024&t=60s");
+  assert.equal(topicHash(out), topicHash(out.replace(/^Every moment/m, "Every moment").replace(/^(# x[\s\S]*?)$/m, "$1")), "same text, same hash");
+  const withRelated = "# x\n\n1 source\n\nRelated: a, b\n\nMoment 00:01:00: One.\n";
+  assert.equal(topicHash(withRelated), topicHash(withRelated.replace("Related: a, b", "Related: c")), "a move in Related is not a change");
+  assert.notEqual(topicHash(withRelated), topicHash(withRelated.replace("One.", "Two.")));
+});
+
+test("a dropped name is no topic: a moment keeps its other topics, and one left with none is counted", () => {
+  const files = [{ path: "moments/a.md", text: moments({ lines: [["00:01:00", "humor", "A joke."], ["00:02:00", "humor, prayer", "Pray first."], ["00:03:00", "prayer", "Pray again."]] }) }];
+  const { ordered, dropped } = buildIndex(files, parseAliases("humor: -\n"));
+  assert.deepEqual(ordered.map(([n]) => n), ["prayer"]);
+  assert.equal(ordered[0][1].moments, 2);
+  assert.equal(dropped, 1);
+});
+
+test("a story is told once: on the first of its topics with a page, marked Told on there everywhere else", () => {
+  const files = [{ path: "moments/a.md", text: moments({ url: "https://youtube.com/watch?v=v", lines: [["00:01:00", "crew, psychology", "The yellow outfit."], ["00:05:00", "psychology, crew", "The couch."], ["00:09:00", "nopage, psychology", "Its first topic has no page."]] }) }];
+  const { ordered } = buildIndex(files, new Map());
+  const get = (n) => /** @type {any} */ (ordered.find(([x]) => x === n))[1];
+  const both = toldOn((n) => n === "crew" || n === "psychology");
+  const psych = topicFile("psychology", get("psychology"), [], "", both);
+  assert.match(psych, /The yellow outfit\.\nLink: [^\n]*t=60s\nTold on: \/topics\/crew\//);
+  assert.doesNotMatch(psych, /The couch\.\nLink: [^\n]*\nTold on/, "its own story");
+  assert.doesNotMatch(psych, /no page\.\nLink: [^\n]*\nTold on/, "a first topic with no page is passed over");
+  assert.match(topicFile("crew", get("crew"), [], "", both), /The couch\.\nLink: [^\n]*\nTold on: \/topics\/psychology\//);
+  assert.doesNotMatch(topicFile("psychology", get("psychology"), [], "", toldOn((n) => n === "psychology")), /Told on/, "no page for crew, so psychology tells it");
+  assert.equal(topicEntries(psych).length, 3, "the mark leaves the moments readable");
+  assert.equal(topicHash(psych), topicHash(psych.replace(/^Told on: .*\n/gm, "")), "a mark that moves is not a change");
+});
+
+test("reused links: a link closing more than one paragraph is listed with each paragraph's opening", () => {
+  const page = "---\ntitle: x\n---\n\nThe couch story here. [1](https://y.com/watch?v=v&t=1s)\n\nThe outfit story here. [2](https://y.com/watch?v=v&t=1s) [2](https://y.com/watch?v=v&t=1s)\n\nOnce. [3](https://y.com/watch?v=v&t=9s)\n";
+  assert.deepEqual(reusedLinks(page), [{ url: "https://y.com/watch?v=v&t=1s", paras: ["The couch story here. [1](https://y.com/watch?v=v&t=1s)", "The outfit story here. [2](https://y.com/watch?v=v&t=1s)"] }]);
+  assert.deepEqual(reusedLinks("---\ntitle: x\n---\n\nOne. [1](https://y.com/a)\n"), []);
+});
+
+test("a topic in nearly every source is flagged only once there are enough sources to mean it", async () => {
+  const each = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`moments/youtube/s/${i}.md`, moments({ lines: [["00:01:00", "budgets", "Budget."]] })]));
+  const few = folder(each(5));
+  await run(few);
+  assert.doesNotMatch(readFileSync(join(few, "index/topics.md"), "utf8"), /nearly every source/);
+  const many = folder(each(8));
+  await run(many);
+  assert.match(readFileSync(join(many, "index/topics.md"), "utf8"), /- budgets: 8 sources, 8 moments, under the publish gate, in nearly every source: is this the site's whole subject\?/);
+});
+
 test("related topics are those sharing moments, most shared first", () => {
   const { relatedOf } = buildIndex([{ path: "x.md", text: moments({ lines: [["00:01:00", "a, b", "1"], ["00:02:00", "a, b, c", "2"]] }) }], new Map());
   assert.deepEqual(relatedOf("a"), ["b", "c"]);
@@ -154,4 +214,18 @@ test("it writes the index, applies the gate, flags a giant, keeps aliases, and a
   writeFileSync(join(cwd, "moments/youtube/a/1.md"), moments({ lines: many("A", 3) }));
   await run(cwd);
   assert.ok(!existsSync(join(cwd, "index/topics/lone-topic.md")));
+  writeFileSync(join(cwd, "moments/youtube/b/2.md"), moments({ lines: [...many("B", 3), ["00:40:00", "giant, shared", "Both."]] }));
+  mkdirSync(join(cwd, "pipeline"), { recursive: true });
+  writeFileSync(join(cwd, "pipeline/state.json"), JSON.stringify({ items: { "page:content/topics/giant.md": { kind: "page", file: "content/topics/giant.md", stage: "page" } } }));
+  await run(cwd);
+  assert.match(readFileSync(join(cwd, "index/topics/shared.md"), "utf8"), /Both\.\nLink: [^\n]*\nTold on: \/topics\/giant\//, "a queued page is a story's home");
+  mkdirSync(join(cwd, "content/topics"), { recursive: true });
+  writeFileSync(join(cwd, "content/topics/giant.md"), "---\ntitle: Giant\n---\n\nText.\n");
+  writeFileSync(join(cwd, "index/aliases.yaml"), "giant: shared\n");
+  assert.match((await run(cwd)).stdout, /content\/topics\/giant\.md has no topic now: a merge or drop took its moments/, "a page's topic merged away is flagged");
+  writeFileSync(join(cwd, "index/aliases.yaml"), "shared: -\n");
+  const dropped = await run(cwd);
+  assert.match(dropped.stdout, /6 moments lost every topic to a drop: retag any worth keeping in moments\//);
+  assert.match(readFileSync(join(cwd, "index/topics.md"), "utf8"), /to drop one, `name: -`; then rebuild\. 6 moments lost every topic to a drop\./);
+  assert.ok(!existsSync(join(cwd, "index/topics/shared.md")));
 });

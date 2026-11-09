@@ -64,6 +64,13 @@ test("a page standing outside the speaker fails", async () => {
   await bad(`In his reading it's wrong ([T](${url})).`, /attributes instead of teaching/);
   await bad(`That is his sharpest example ([T](${url})).`, /attributes instead of teaching/);
 });
+test("a sentence pointing at another page instead of making its point fails", async () => {
+  await bad(`The banquet scene is told under [Jesus](/topics/jesus/) ([T](${url})).`, /"is told under \[" points at another page/);
+  await bad(`That pattern belongs with [reading in context](/topics/bible/) ([T](${url})).`, /points at another page/);
+  await bad(`The dedicated guide explains it ([T](${url})).`, /points at another page/);
+  const r = await run(setup(`One empty night says little about [a calling](/topics/calling/) ([T](${url})).`), ["pages"]);
+  assert.doesNotMatch(r.stderr, /points at another page/, "a sentence with the link on its words passes");
+});
 test("--json is misuse in plain text", async () => {
   const r = await run(setup("x"), ["pages", "--json"]);
   assert.equal(r.status, 2);

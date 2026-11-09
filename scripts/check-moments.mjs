@@ -109,7 +109,7 @@ export function checkMoments(name, text, rawText, { final = false } = {}) {
     const minutes = end / 60;
     hints.push(`${moments.length} moments in ${Math.round(minutes)} minutes, one per ${(minutes / moments.length).toFixed(1)}`);
     const stops = [0, ...moments.map((m) => m.at), end];
-    for (let i = 1; i < stops.length; i++) if (stops[i] - stops[i - 1] > GAP_MINUTES * 60) hints.push(`nothing from ${clock(stops[i - 1])} to ${clock(stops[i])}; fine if that stretch is empty, worth a look if not`);
+    for (let i = 1; i < stops.length; i++) if (stops[i] - stops[i - 1] > GAP_MINUTES * 60) hints.push(`nothing from ${clock(stops[i - 1])} to ${clock(stops[i])}; fine if that stretch is empty, read it if not`);
   }
   return { problems, hints, moments: moments.length, strongest: strongest.length, hasGist: !!gist };
 }

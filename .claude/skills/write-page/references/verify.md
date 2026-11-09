@@ -14,7 +14,7 @@ whole transcript. Then correct the page in place, with the smallest edit:
 - **Only the transcripts.** A rule, fact or doubt they never gave goes. So does commentary and attribution ("he argues", "his sharpest example"): teach the point straight.
 - **Clear.** A heading that's clever instead of saying its point gets rewritten.
 - **A quote with the wrong reason.** The words are exact, but the sentence around them gives another subject or cause. Say what they were talking about.
-- **What they actually meant.** A host's hypothetical or a voice they're putting on isn't their view. What they conceded stays what they conceded. Where they conflict, both points stay.
+- **What they actually meant.** A host's hypothetical or a voice they're putting on isn't their view. What they conceded stays what they conceded. Where they disagree, both views stay, and the page says they differ.
 - **How sure they were,** both ways: a gain without the loss they gave beside it, and conviction softened into caution. Cut any disclaimer about the page itself.
 - **A guide's order.** Its route must be one they describe. If they give two ways in, give two.
 

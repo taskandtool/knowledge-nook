@@ -205,6 +205,9 @@ Their boldest claim and why, then their best story and what tempers it. Under 90
 
 **How topics relate.** Each point lives on the most specific page where it is
 true. A broader page keeps a short summary and links to the narrower one. A
+moment tagged with two topics is told on the first of them with a page, written
+or queued; every other topic file marks it `Told on:`, and there it gets a
+sentence and a link. A
 section becomes its own page when it outgrows a screen and has enough sources.
 Pages declare their relationships in front matter, and the site renders the
 links from those fields:
@@ -228,7 +231,7 @@ real text and real links:
 - Related topics on each topic page as poster tiles (its own related ones first, then the nearest), when there are two or more.
 - "Where this comes from" at the end of a written page: a chart of the videos it cites, by date, when there are two dates or more, then one row per video with the points cited from it.
 - Beside the writing, the video being cited where you're reading, as a thumbnail from YouTube's public image address, and its line, large. The player loads on a click.
-- Footnotes: a small number that reads past, a card on hover or tap with the source and its line, and a click that goes to our source page at that moment, not to YouTube.
+- Footnotes: a small number that reads past, with a card on hover or keyboard focus. On a phone or touch screen, one tap plays the cited video moment in the topic's panel and brings it into view; a return link restores the reader's place at that exact occurrence of the number. Other clicks go to our source page at that moment, not to YouTube. A source opened at a timestamp shows its player on a phone and its matching read on a wide screen. Without the script, numbers still link to the notes below.
 
 **Calm by rule.** If a reader can see something, they can open it: a topic with no page never
 shows publicly. Red means one thing, a citation: the footnote marks and the chart's dots. Timestamps are quiet gray, red on hover.
@@ -349,9 +352,9 @@ happened to `log.md`.
 | Script | Does |
 |---|---|
 | `sources.mjs` | `list`: a channel or site's counts, hours and estimate, spending at most the listing's credits, and what to leave out (`--since`, `--min-minutes`, `--language`). `fetch`: pending sources into `raw/`, resuming after a stop, and needs `--confirm` since it spends credits. `crawl`: a website's pages into `raw/web/<host>/` through `tt-crawl`, and every known site again with no address |
-| `pipeline.mjs` | The state of everything. `status`: what is pending at each stage, ignoring `tt-crawl`'s own reports and indexes. `queue`: what to work on, such as `--sample 20`, `--all` or `--pages`. `next`: claims one item with a lock, so jobs never take the same one. `done`: marks it once its check passes, so a run cannot pass work the check refuses. `tick`: see below. `watch`: the standing jobs, on the owner's yes |
+| `pipeline.mjs` | The state of everything. `status`: what is pending at each stage, ignoring `tt-crawl`'s own reports and indexes. `queue`: what to work on, such as `--sample 20`, `--all` or `--pages`. `next`: claims one item with a lock, so jobs never take the same one; a page whose moments changed is rewritten whole. `done`: marks it once its check passes, so a run cannot pass work the check refuses. `tick`: see below. `watch`: the standing jobs, on the owner's yes |
 | `check-distilled.mjs` | Coverage to the end with no unexplained gap, length (speech keeps 20% to 40%, and `SITE.md` can change that), thin stretches, quotes that really appear, names and numbers added or dropped, front matter. Any language. No `tropes`: distillations are private, and it flags a subject's own words ("leverage" on an investing channel); `scripts/check.mjs` runs it on public pages |
-| `build-index.mjs` | `index/topics.md` and every `index/topics/<topic>.md`, applying aliases: each moment with its link and the notes around it. Related topics by shared moments. Which topics pass the publish gate, and which are big enough to split |
+| `build-index.mjs` | `index/topics.md` and every `index/topics/<topic>.md`, applying aliases (`name: -` drops one): each moment with its link, a `Told on:` mark where another page tells it, and the notes around it. Related topics by shared moments. Which topics pass the publish gate, and which are big enough to split |
 | `scripts/check.mjs` | `npm run check`, the shape of the Website app's, with `check-site.mjs` reading `dist/`: links, orphans, the publish gate, SEO, page quotes traced to `raw/`, `tropes`, no private text and no unsafe HTML or links in `dist/` |
 
 ### Skills
@@ -366,8 +369,8 @@ bare prompt so it earns its place.
 | `distill` | The read, one source per run | A future version of the speaker: every idea and story, no fluff |
 | `moments` | Moments, one source per run, a fresh run | The nuggets: color is the job, accuracy the limit |
 | `align` | A third fresh run per source | Fixes moments and notes against the transcript, writes the gist and picks. A fresh reader has caught real errors on every kind of work tried here |
-| `topics` | After a batch of distilling | Merging names, the topic tree |
-| `write-page` | One page or speaker take at a time, then a second fresh run to verify it (`references/verify.md`) | The writing standard, attribution, page relationships. Verifying is not optional: three rounds of tightening the writing rules (Nov 2026) left figures and quotes right but kept producing the writer's own rules credited to the speaker and links minutes off, and a fresh reader with the transcript found them each time |
+| `topics` | After a batch of distilling, and on each later batch's new names and big topics | Merging names, splitting by question, the topic tree |
+| `write-page` | One page or speaker take at a time, written or rewritten whole, then a second fresh run to verify it (`references/verify.md`) | The writing standard, attribution, page relationships. Verifying is not optional: three rounds of tightening the writing rules (Nov 2026) left figures and quotes right but kept producing the writer's own rules credited to the speaker and links minutes off, and a fresh reader with the transcript found them each time |
 | `cross-check` | Before a first deploy and in the audit | Overlap, missing links, citation samples, Search Console |
 | `site` | Changing how the site works | Templates, visualizations, SEO |
 
@@ -413,7 +416,7 @@ job runs the machinery:
 
 **`pipeline.mjs tick`** moves the queue along with no AI. It fetches what is pending
 (stopping before the job's 30 minutes), adds the distill jobs when sources are ready,
-rebuilds `index/` when distilling finishes, queues the pages that new sections touched,
+rebuilds `index/` when distilling finishes, has a run sort the batch's new topic names, queues the pages whose moments changed,
 adds the write job, removes each job when its queue is empty, posts activity, and
 removes itself when nothing is left. After a vendor stops it (out of credits, a refusal) it says
 so once and waits 6 hours before asking again. It uses the bridge's `schedule-job`, `list-jobs`

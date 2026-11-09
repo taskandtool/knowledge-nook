@@ -21,7 +21,8 @@ sitemap against the publish gate, long runs of transcript text, unsafe HTML and
 links, and file counts and sizes.
 
 pages: checks one page, or every page under content/: each quote is in raw/ and at most 30
-words, nothing attributes instead of teaching ("he argues", "Ortiz says"), a link at least every 4 sentences, each link to a
+words, nothing attributes instead of teaching ("he argues", "Ortiz says") or points at another page instead
+of making the point ("told under [x]"), a link at least every 4 sentences, each link to a
 video names a video in raw/ at a moment it has, each other link is a source in raw/,
 a quote or figure in a video's captions is within 4 minutes of the moment linked after
 it, and the front matter is whole. Then tropes for AI tells.
@@ -31,6 +32,8 @@ Failures say the line and what to do. Exit 0 passed, 1 has problems, 2 used wron
 const MAX_QUOTE_WORDS = 30;
 /** How a third party writes about someone. Past tense stays: a speaker tells what others said. */
 const THIRD_PERSON = /\b(?:(?:he|she) (?:says|argues|contends|believes|recalls|warns|claims|thinks|describes|calls)\b|in (?:his|her) (?:view|reading|telling|account|words)\b|(?:his|her) (?:sharpest|strongest|central|main|best) (?:example|point|claim|story)\b)/i;
+/** A sentence about where a story is told, instead of the story's point with the link on its words. */
+const POINTER = /\b(?:(?:is|are|was|were) (?:told|covered|explained|discussed|treated) (?:under|on|in|at) \[|belongs? (?:with|in|under|on) \[|the (?:dedicated|separate) (?:guide|page)\b)/i;
 const MAX_SENTENCES_PER_LINK = 4;
 /** How far a claim may sit from the moment its link opens, before a reader gives up looking. */
 const NEAR_SECONDS = 240;
@@ -178,6 +181,8 @@ export function checkPage(name, text, raw, names = []) {
       const ours = quotesOn(clean).quotes.reduce((rest, q) => rest.replace(q, ""), clean);
       const third = THIRD_PERSON.exec(ours)?.[0] ?? speakers?.exec(ours)?.[0];
       if (third) note(i + 1, `"${third}" attributes instead of teaching; say the point itself, and let the footnote show the source: ${ours.trim().slice(0, 60)}`);
+      const pointer = POINTER.exec(line)?.[0];
+      if (pointer) note(i + 1, `"${pointer}" points at another page; make the point in a sentence and put the link on its words: ${ours.trim().slice(0, 60)}`);
     }
     const { quotes, odd } = quotesOn(clean);
     section.quotes += quotes.length;

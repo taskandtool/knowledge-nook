@@ -24,6 +24,19 @@ Installed with one click on Task & Tool, or cloned into a repository of your own
 `SITE.md` holds the owner's rules for the subject. `ARCHITECTURE.md` is the design and `PROCESS.md` how
 it runs.
 
+## Ideas not built
+
+**Updating pages instead of rewriting them.** An update run would read the page and only the new
+moments, each with the earlier moments it resembles, and take the first case that fits: a repeat
+adds a link at most; a better telling replaces the old one only if it keeps everything, caveats
+included; a new angle gets a sentence where it belongs; a disagreement or a change of mind gets both
+views, dated; material for a narrower page goes there; a passing mention changes nothing. It would
+never drop a link or reword a sentence it isn't changing, and would hand the page to a rewrite
+when the lead changes. Tested in Nov 2026 against whole rewrites on two samples, it cost 25-35%
+less and kept every verified paragraph, but blind readers preferred the rewrites on 23 of 27
+pages, for coverage and flow, with accuracy about equal. Topics stay small enough to rewrite by
+splitting instead.
+
 ## Off Task & Tool
 
 Set `SCRAPECREATORS_API_KEY`, run `npm install`, and follow `PROCESS.md` with Codex or Claude Code in the

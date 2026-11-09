@@ -242,6 +242,7 @@ test("pages wait for every source, then are claimed one at a time and checked", 
   assert.equal((await run(cwd, ["done", "content/topics/budgets.md"])).status, 1, "the writer cannot pass its own verify");
   const verify = await run(cwd, ["next", "page"]);
   assert.match(verify.stdout, /verify content\/topics\/budgets\.md/);
+  assert.doesNotMatch(verify.stdout, /Check these links first/, "nothing to point at when no link is reused");
   assert.match(verify.stdout, /references\/verify\.md/);
   assert.equal((await run(cwd, ["done", "content/topics/budgets.md"])).status, 0);
   assert.equal(state(cwd).items["page:content/topics/budgets.md"].stage, "done");
@@ -578,3 +579,95 @@ test("the whole loop's output names only what the owner can act on: never a depl
   }
 });
 
+
+test("a written page is rewritten whole when its moments change: new names and big topics sorted first, and a move in Related is not a change", async () => {
+  const cwd = machine(withVideos("aaa", "bbb"));
+  const moments = (id, lines) => writeMoments(cwd, id, `---\ntitle: "Talk ${id}"\nurl: https://youtube.com/watch?v=${id}\n---\n\n## Gist\n\nBudgets.\n\n## Strongest\n\n- 00:00:00 Budgets.\n\n## Moments\n\n${lines.join("\n")}\n`);
+  for (const id of ["aaa", "bbb"]) writeDistilled(cwd, id);
+  moments("aaa", ["- 00:00:00 | budgets | Budgets are \"a dumb rule\".", "- 00:05:00 | budgets | Budgets keep spending honest."]);
+  await run(cwd, ["queue", "--all", "--confirm"]);
+  // bbb is not read yet: only aaa counts as finished.
+  setState(cwd, (s) => { s.items["youtube:aaa"].stage = "done"; delete s.items["youtube:bbb"]; });
+  assert.match((await run(cwd, ["tick"])).stdout, /rebuilt index/);
+  const file = "content/topics/budgets.md";
+  const page = (body) => { mkdirSync(join(cwd, "content/topics"), { recursive: true }); writeFileSync(join(cwd, file), `---\ntype: topic\ntitle: Budgets\ndescription: A long enough sentence about what the speaker thinks of budgets in general.\n---\n\n${body}\n`); };
+  const first = "I call it \"a dumb rule\" ([1](https://youtube.com/watch?v=aaa&t=0s)).";
+  await run(cwd, ["queue", "--pages", "--topic", "budgets", "--confirm"]);
+  const write = await run(cwd, ["next", "page"]);
+  assert.match(write.stdout, /pipeline next: write content\/topics\/budgets\.md/);
+  assert.doesNotMatch(write.stdout, /was verified/, "a first write has no verified page to keep links from");
+  page(first);
+  await run(cwd, ["done", file]);
+  await run(cwd, ["next", "page"]);
+  assert.equal((await run(cwd, ["done", file])).status, 0);
+  assert.equal(Object.keys(state(cwd).pages[file].moments).length, 2, "the page knows what it was written from");
+
+  // Rebuilt with nothing new: the page is left alone.
+  moments("aaa", ["- 00:00:00 | budgets | Budgets are \"a dumb rule\".", "- 00:05:00 | budgets | Budgets keep spending honest."]);
+  assert.doesNotMatch((await run(cwd, ["tick"])).stdout, /queued/);
+
+  // A new source, with a name the site has not used.
+  moments("bbb", ["- 00:00:00 | budgets | Budgets are \"a dumb rule\" for spending.", "- 00:05:00 | envelopes | Cash envelopes keep spending honest."]);
+  const sorted = await run(cwd, ["tick"]);
+  assert.match(sorted.stdout, /1 new topic names to sort before any page/);
+  assert.equal(state(cwd).items[`page:${file}`].stage, "done", "pages wait for the sort");
+  assert.match(readFileSync(join(cwd, "pipeline/briefs/batch.md"), "utf8"), /## New names[\s\S]*- envelopes: 1 moment in 1 source\(s\)\. First: Cash envelopes/);
+  assert.doesNotMatch((await run(cwd, ["tick"])).stdout, /queued/, "and keep waiting while it is open");
+  const tidy = await run(cwd, ["next", "page"]);
+  assert.match(tidy.stdout, /sort the batch's topics/);
+  assert.match(tidy.stdout, /with the topics skill: only those/);
+  setState(cwd, (st) => { st.items[`page:${file}`].stage = "page"; });
+  assert.match((await run(cwd, ["next", "page"])).stdout, /pages wait until another run has sorted the topics/, "no page while a sort is open");
+  setState(cwd, (st) => { st.items[`page:${file}`].stage = "done"; delete st.items[`page:${file}`].claimed_at; });
+  writeFileSync(join(cwd, "index/aliases.yaml"), "envelopes: budgets\n");
+  assert.equal((await run(cwd, ["done", "index/aliases.yaml"])).status, 0);
+  assert.match((await run(cwd, ["tick"])).stdout, /queued 1 pages whose moments changed/);
+
+  // The page is rewritten whole, then verified, and remembers its new moments.
+  const again = await run(cwd, ["next", "page"]);
+  assert.match(again.stdout, /pipeline next: rewrite content\/topics\/budgets\.md/);
+  assert.match(again.stdout, /Rewrite that page whole from index\/topics\/budgets\.md/);
+  assert.match(again.stdout, /The page there now was verified: a point you keep keeps its link/);
+  page(`${first}\n\nCash envelopes keep spending honest ([2](https://youtube.com/watch?v=bbb&t=300s)).\n\nEnvelopes again ([3](https://youtube.com/watch?v=bbb&t=300s)).\n\nFrom the notes ([4](https://youtube.com/watch?v=bbb&t=280s)).`);
+  assert.equal((await run(cwd, ["done", file])).status, 0);
+  const check = await run(cwd, ["next", "page"]);
+  assert.match(check.stdout, /pipeline next: verify content\/topics\/budgets\.md/);
+  assert.match(check.stdout, /Check these links first[^\n]*\n\s+https:\/\/youtube\.com\/watch\?v=bbb&t=300s: "Cash envelopes keep spending honest…", "Envelopes again \(\[3\]\(https:\/\/youtube\.com\/watch\?v=bbb&t=300s\)\)\.…"/);
+  assert.doesNotMatch(check.stdout, /v=aaa&t=0s:/, "a link used once is not listed");
+  assert.match(check.stdout, /These links are no moment of index\/topics\/budgets\.md, so the writer took them from the notes: https:\/\/youtube\.com\/watch\?v=bbb&t=280s\n/);
+  assert.equal((await run(cwd, ["done", file])).status, 0);
+  assert.equal(Object.keys(state(cwd).pages[file].moments).length, 4);
+  assert.equal((await run(cwd, ["done", file, "--rewrite", "x"])).status, 2, "there is no update to hand back");
+
+  // Grown past the split size: one look before the page, and the next only once it has doubled.
+  const many = (n, from = 0) => Array.from({ length: n }, (_, k) => `- 00:${String(Math.floor((k + from) / 6) % 60).padStart(2, "0")}:${String(((k + from) % 6) * 10).padStart(2, "0")} | budgets | Budgets point ${k + from}.`);
+  moments("bbb", many(31));
+  const big = await run(cwd, ["tick"]);
+  assert.match(big.stdout, /1 big topics to sort before any page/);
+  const brief = readFileSync(join(cwd, "pipeline/briefs/batch.md"), "utf8");
+  assert.match(brief, /## Big enough to split[\s\S]*one point said many ways, or separate questions\?[\s\S]*### budgets\n\n- Talk aaa, 2020-01-02 00:00:00: Budgets are "a dumb rule"\./);
+  assert.match(brief, /Budgets point 30\./, "every moment, one a line");
+  await run(cwd, ["next", "page"]);
+  assert.equal((await run(cwd, ["done", "index/aliases.yaml"])).status, 0);
+  assert.match((await run(cwd, ["tick"])).stdout, /queued 1 pages/);
+  setState(cwd, (s) => { s.items[`page:${file}`].stage = "done"; });
+  moments("bbb", many(40));
+  assert.doesNotMatch((await run(cwd, ["tick"])).stdout, /big topics/, "42 is not double 33");
+  setState(cwd, (s) => { s.items[`page:${file}`].stage = "done"; });
+  moments("bbb", many(70));
+  assert.match((await run(cwd, ["tick"])).stdout, /1 big topics to sort/);
+});
+
+test("names a tidy made, rebuilding the index itself, are not new to the next batch", async () => {
+  const cwd = machine(withVideos("aaa", "bbb"));
+  for (const id of ["aaa", "bbb"]) writeDistilled(cwd, id);
+  writeMoments(cwd, "aaa");
+  await run(cwd, ["queue", "--all", "--confirm"]);
+  setState(cwd, (s) => { s.items["youtube:aaa"].stage = "done"; delete s.items["youtube:bbb"]; });
+  await run(cwd, ["tick"]);
+  writeFileSync(join(cwd, "index/aliases.yaml"), "budgets: money\n");
+  assert.equal((await run(cwd, [], {}, "scripts/build-index.mjs")).status, 0);
+  writeMoments(cwd, "bbb", goodMoments("bbb").replace("| budgets |", "| envelopes |"));
+  assert.match((await run(cwd, ["tick"])).stdout, /1 new topic names/);
+  assert.doesNotMatch(readFileSync(join(cwd, "pipeline/briefs/batch.md"), "utf8"), /money/);
+});

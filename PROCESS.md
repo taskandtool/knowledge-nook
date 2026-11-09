@@ -74,7 +74,7 @@ sample of later sources too, since quality can drift from the first batch.
 ### 5. Tidy the topics
 
 `tick` rebuilds `index/` when the sources finish. The `topics` skill merges the names moments
-were tagged with into the few real subjects, in `index/aliases.yaml`, splits what's too big, and arranges a topic tree.
+were tagged with into the few real subjects, in `index/aliases.yaml`, drops names that are no subject (`humor: -`), splits what's too big, and arranges a topic tree.
 
 **Check:** the owner has seen the tree and agrees it is what the site should be.
 
@@ -125,15 +125,22 @@ new sources" job, a command that costs no AI when nothing is new:
 
 1. `sources.mjs list` finds what is new. If nothing is, it stops.
 2. `pipeline.mjs queue --new --confirm` queues it and starts `tick`. The owner's yes to `watch` covers this.
-3. `tick` fetches, adds the distill jobs, rebuilds `index/` when they finish, queues the
-   pages the new sections touched and any new topics that now pass the gate, and adds the
-   write job.
-4. "Write next page" updates each page from its whole topic file, and the checks run.
+3. `tick` fetches, adds the distill jobs and rebuilds `index/` when they finish. Before any
+   page, one run with the `topics` skill sorts what the batch changed: each name the site
+   hasn't used joins the topic a reader would look it up under, is dropped, or stays a new idea
+   that waits under the gate for a second source; and each topic that has grown past 30 moments (checked
+   again when it doubles) splits into questions a reader would look up apart, the old topic
+   staying as the broader page, or stays whole when it is one point said many ways. No page is
+   written while the sort is open. Then `tick` queues the pages whose moments changed and
+   any new topics that now pass the gate, and adds the write job.
+4. "Write next page" rewrites each of those pages whole from its topic file, keeping the
+   verified links of the points it keeps, and a fresh run verifies it, starting with any link
+   that closes two paragraphs. A big topic's file keeps every moment but only the notes that fit one read: the
+   moments its page cites and the newest sources first.
 5. Deploying follows the owner's choice. If they agreed to automatic deploys (`Automatic deploys: yes` in `SITE.md`), `tick` deploys
    once the checks pass. Otherwise, it posts an activity line saying pages are ready, and the
    owner asks for the deploy in chat.
 
-New topic names are not merged automatically. They wait for the audit or the owner.
 
 ### Changed websites
 
@@ -144,12 +151,6 @@ citing them are queued.
 ### Removed sources and correction requests
 
 `sources.mjs list --full` flags a video that has gone. A correction request comes through the footer's contact, and a person decides. When something is removed, delete its notes, moments and takes, and `index/topics.md`: the next `tick` rebuilds the index and queues every page that cited it.
-
-### Occasional rewrites
-
-Pages updated many times can read as patched together, and page structure tends to follow the
-order material arrived in. Rewrite them from their whole topic file every so often. No
-transcripts are needed.
 
 ## Part 3: Keeping the site healthy
 
