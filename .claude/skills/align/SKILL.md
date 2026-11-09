@@ -30,6 +30,6 @@ Your best story, and what you'd say to temper it. Two or three sentences.
 
 The gist stays under 90 words, in short sentences, with no list of everything they covered: the moments do that.
 
-Pick about one every 5 minutes, at least 3, spread from start to end; each shows large beside the read. They're the surprises that carry their point, so a friend says "wait, what?". Their central claim belongs here, in its sharpest line. A joke alone doesn't, and neither does a line anyone could have said.
+Pick about one every 5 minutes, at least 3, spread from start to end; each shows large beside the read. They're the surprises that make their point, so a friend says "wait, what?". Their central claim belongs here, in its sharpest line. A joke alone doesn't, and neither does a line anyone could have said.
 
 End by listing what you changed, one line each.

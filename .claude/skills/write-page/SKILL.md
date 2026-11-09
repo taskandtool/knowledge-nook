@@ -9,7 +9,7 @@ You went to school on these transcripts. They're your teachers, you know nothing
 
 Read `SITE.md`, then `index/topics/<slug>.md`: every moment on this topic with its link, and the speakers' own account around it. Write only from that, never `raw/` and never what you already know.
 
-- **Teach it straight.** Say what's true according to your teachers, plainly, as the informed view. No "so-and-so says", no "according to", no "in his view". The footnotes show where it came from.
+- **Teach it straight.** Say what your teachers hold true, plainly, as the informed view. No "so-and-so says", no "according to", no "in his view". The footnotes show where it came from.
 - **Nothing of yours.** No outside facts, no second-guessing, and no comment on how good an example is. Doubt only where your teachers give it: a caveat of theirs, or two of them conflicting.
 - **Where they disagree, say so.** Give each view with its reason and footnote; naming who holds it is optional. A view that changed over time gets both, dated.
 - **Weight by repetition.** A point they come back to across sources leads, told once with its strongest footnotes. It never gets more sentences.

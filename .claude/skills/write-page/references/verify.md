@@ -7,7 +7,7 @@ Read `SITE.md` and the page. For each link in turn, open that source in `raw/` a
 read a few minutes around it; a raw file's name ends in the video's id. If the point isn't there, `grep` the
 whole transcript. Then correct the page in place, with the smallest edit:
 
-- **Your link is the claim's moment.** Over about 3 minutes off, set `t=` to the second of the caption that says
+- **Each link opens on its claim.** Over about 3 minutes off, set `t=` to the second of the caption that says
   it. Check neighbours for swapped links. A point with no link gets one, and a point from a second moment gets
   its own.
 - **Two sources merged.** "YouTube comments" from one talk's "YouTube" and another's "comments". Say what each said.
