@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "needs": {
     "connections": [
-      { "provider": "scrapecreators", "strength": "suggested", "why": "Read YouTube channels and their transcripts" }
+      { "provider": "scrapecreators", "strength": "suggested", "why": "Read YouTube channels and their transcripts" },
+      { "provider": "youtube", "strength": "suggested", "why": "Read your own channel's videos and captions, with no credits" }
     ]
   },
   "ready": {

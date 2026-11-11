@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // What to read and getting it: a channel's videos into sources/, their
 // transcripts into raw/. ScrapeCreators through the machine's gateway, because
-// YouTube blocks machines like ours. No AI, so a command job can run it.
+// YouTube blocks machines like ours; the owner's own channel can come through
+// the YouTube connection instead. No AI, so a command job can run it.
 import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -10,7 +11,7 @@ import { done, fail, flag, flags, has, limitOf, machineEnv, misused, noMore, par
 
 const HELP = `usage: node scripts/sources.mjs <command>
 
-  list [channel] [--max-pages N] [--full] [--since YYYY-MM-DD] [--min-minutes N] [--language CODE]
+  list [channel | --mine] [--max-pages N] [--full] [--since YYYY-MM-DD] [--min-minutes N] [--language CODE]
       A channel's videos into sources/<channel>.json, with their count, hours and
       the credits to fetch them. Costs 1 credit per page. Safe to run again: it adds
       what is new and stops at the first page with nothing new. --full reads every
@@ -19,6 +20,9 @@ const HELP = `usage: node scripts/sources.mjs <command>
       --min-minutes and --language set what to leave out, and stay until changed;
       --language is a caption language such as en, and a video without it counts as
       having no captions.
+      --mine lists the channel of the account signed in to the youtube connection,
+      and from then on that channel comes through YouTube: no credits, but YouTube
+      allows about 40 videos' captions a day, only from videos that account can edit.
 
   fetch [channel] [--limit N] [--id VIDEO]... [--max-minutes N] [--confirm]
       Pending videos into raw/youtube/<channel>/<date>-<id>.md, newest first. Costs
@@ -38,6 +42,11 @@ Exit 0 done, 1 failed or refused, 2 used wrongly.`;
 
 const LISTED = "node scripts/sources.mjs list @handle";
 const CONNECT = `python3 ~/tools/taskandtool.py request-connection scrapecreators --why "To read YouTube channels and their transcripts"`;
+const CONNECT_YT = `python3 ~/tools/taskandtool.py request-connection youtube --why "To read your own channel's videos and captions"`;
+/** What one video costs on YouTube's daily quota: a caption list, a download and its details. */
+const YT_UNITS = 251;
+/** Videos a day on YouTube's default 10,000 daily units. */
+export const YT_PER_DAY = Math.round(10_000 / YT_UNITS);
 const SLUG = /^[\p{L}\p{N}._-]+$/u;
 const WORKERS = 4;
 const RETRIES = 3;
@@ -59,13 +68,32 @@ export function parseChannel(raw) {
   return { key: handle.toLowerCase(), param: { handle } };
 }
 
-/** How this app reaches ScrapeCreators, or the ask for a connection. */
-function vendor() {
+/** The two ways in: ScrapeCreators for any channel, YouTube itself for the owner's own. */
+const VENDORS = {
+  scrapecreators: {
+    name: "ScrapeCreators",
+    connect: CONNECT,
+    own: (/** @type {any} */ env) => env.SCRAPECREATORS_API_KEY ?? env.SCRAPE_CREATORS_API_KEY,
+    base: (/** @type {any} */ env) => env.SCRAPECREATORS_BASE_URL ?? "https://api.scrapecreators.com",
+    header: (/** @type {string} */ key) => ({ "x-api-key": key }),
+  },
+  youtube: {
+    name: "YouTube",
+    connect: CONNECT_YT,
+    own: (/** @type {any} */ env) => env.YOUTUBE_ACCESS_TOKEN,
+    base: (/** @type {any} */ env) => env.YOUTUBE_BASE_URL ?? "https://www.googleapis.com",
+    header: (/** @type {string} */ key) => ({ authorization: `Bearer ${key}` }),
+  },
+};
+
+/** How this app reaches a vendor, or the ask for a connection. @param {"scrapecreators" | "youtube"} via */
+function vendor(via) {
   const env = machineEnv();
-  if (env.PHOENIX_URL && env.MACHINE_TOKEN) return { base: `${env.PHOENIX_URL.replace(/\/+$/, "")}/api/machine/gateway/scrapecreators`, key: env.MACHINE_TOKEN };
-  const own = env.SCRAPECREATORS_API_KEY ?? env.SCRAPE_CREATORS_API_KEY;
-  if (own) return { base: env.SCRAPECREATORS_BASE_URL ?? "https://api.scrapecreators.com", key: own };
-  return fail("sources: this app has no ScrapeCreators connection", CONNECT);
+  const v = VENDORS[via];
+  if (env.PHOENIX_URL && env.MACHINE_TOKEN) return { ...v, url: `${env.PHOENIX_URL.replace(/\/+$/, "")}/api/machine/gateway/${via}`, key: env.MACHINE_TOKEN };
+  const own = v.own(env);
+  if (own) return { ...v, url: v.base(env), key: own };
+  return fail(`sources: this app has no ${v.name} connection`, v.connect);
 }
 
 /** A problem that ends the whole run, because every later call would hit it too. */
@@ -82,39 +110,50 @@ class Skip extends Error {}
 
 const wait = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
 
-/** A call to ScrapeCreators, with backoff inside, counting what it charged. */
-function client() {
-  const { base, key } = vendor();
-  const spent = { credits: 0 };
-  /** @param {string} path @param {Record<string, string>} params */
-  const call = async (path, params) => {
+/** What a YouTube call costs on the day's quota. @param {string} path */
+const unitsOf = (path) => (path.startsWith("/youtube/v3/captions/") ? 200 : path === "/youtube/v3/captions" ? 50 : 1);
+
+/**
+ * Calls to one vendor, with backoff inside, adding what each charged to `spent`.
+ * @param {"scrapecreators" | "youtube"} via @param {{ credits: number, units: number }} spent
+ */
+function client(via, spent) {
+  const { name, connect, url: base, key, header } = vendor(via);
+  /** @param {string} path @param {Record<string, string>} params @param {{ text?: boolean }} [as] */
+  const call = async (path, params, as = {}) => {
     const url = `${base}${path}?${new URLSearchParams(params)}`;
     let last = "";
     for (let attempt = 0; attempt <= RETRIES; attempt++) {
       if (attempt) await wait(1000 * 2 ** (attempt - 1));
       let res;
       try {
-        res = await fetch(url, { headers: { "x-api-key": key }, signal: AbortSignal.timeout(120_000) });
+        res = await fetch(url, { headers: header(key), signal: AbortSignal.timeout(120_000) });
       } catch (e) {
         last = `could not reach it (${e instanceof Error ? e.message : e})`;
         continue;
       }
       const refusal = res.headers.get("x-tasktool-refusal");
       // A refusal over load or an outage passes; the rest need a person.
-      if (refusal && res.status !== 429 && res.status < 500) throw new Halt(`Task & Tool refused the ScrapeCreators call (${refusal})`, CONNECT);
-      if (res.status === 401) throw new Halt("ScrapeCreators refused the key (401)", CONNECT);
-      if (res.status === 402) throw new Halt("ScrapeCreators is out of credits (402)", "add credits at https://app.scrapecreators.com, then run this again");
-      if (res.status === 429 || res.status >= 500) {
-        last = `ScrapeCreators answered ${res.status}`;
+      if (refusal && res.status !== 429 && res.status < 500) throw new Halt(`Task & Tool refused the ${name} call (${refusal})`, connect);
+      if (res.status === 401) throw new Halt(`${name} refused the key (401)`, connect);
+      if (res.status === 402) throw new Halt(`${name} is out of credits (402)`, "add credits at https://app.scrapecreators.com, then run this again");
+      const text = await res.text();
+      // YouTube says why it refused: the day's quota, a burst, or a sign-in without the captions permission.
+      const reason = via === "youtube" && res.status === 403 ? (() => { try { return JSON.parse(text)?.error?.errors?.[0]?.reason ?? ""; } catch { return ""; } })() : "";
+      if (reason === "quotaExceeded" || reason === "dailyLimitExceeded") throw new Halt("YouTube's daily quota is used up (403)", "run this again after midnight Pacific time; progress is kept");
+      if (reason === "insufficientPermissions") throw new Halt("the YouTube sign-in does not allow reading captions (403)", `connect YouTube again with the captions permission (youtube.force-ssl): ${connect}`);
+      if (res.status === 429 || res.status >= 500 || /rateLimitExceeded/.test(reason)) {
+        last = `${name} answered ${res.status}`;
         continue;
       }
-      const text = await res.text();
-      if (!res.ok) throw new Skip(`ScrapeCreators answered ${res.status}: ${text.slice(0, 200)}`);
+      if (!res.ok) throw new Skip(`${name} answered ${res.status}: ${text.slice(0, 200)}`);
+      if (via === "youtube") spent.units += unitsOf(path);
+      if (as.text) return text;
       let body;
       try {
         body = JSON.parse(text);
       } catch {
-        throw new Skip(`ScrapeCreators answered something other than JSON: ${text.slice(0, 200)}`);
+        throw new Skip(`${name} answered something other than JSON: ${text.slice(0, 200)}`);
       }
       spent.credits += Number(body?.credits_charged) || 0;
       return body;
@@ -122,8 +161,100 @@ function client() {
     // An outage is no video's fault: stop, so nothing is marked failed for it.
     throw new Halt(`${last}, after ${RETRIES + 1} tries`, "run this again in a few minutes; progress is kept");
   };
-  return { call, spent };
+  return call;
 }
+
+/** A client per vendor, made on first use, all adding to one `spent`. @param {{ credits: number, units: number }} spent */
+function clients(spent) {
+  /** @type {Record<string, Function>} */
+  const made = {};
+  return (/** @type {"scrapecreators" | "youtube"} */ via) => (made[via] ??= client(via, spent));
+}
+
+/** Which vendor a channel comes through. @param {any} channel @returns {"scrapecreators" | "youtube"} */
+const viaOf = (channel) => channel.via ?? "scrapecreators";
+
+/** What a run spent, in each vendor's own money. @param {{ credits: number, units: number }} spent */
+const spentText = (spent) => `${spent.credits} credits spent${spent.units ? `, ${spent.units} YouTube units used` : ""}`;
+
+/** "PT1H2M3S" in seconds. @param {string} [iso] */
+export function isoSeconds(iso) {
+  const m = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(iso ?? "");
+  return m ? (Number(m[1] ?? 0) * 24 + Number(m[2] ?? 0)) * 3600 + Number(m[3] ?? 0) * 60 + Number(m[4] ?? 0) : undefined;
+}
+
+/** An SRT caption file as the segments ScrapeCreators gives. @param {string} srt */
+export function parseSrt(srt) {
+  const out = [];
+  for (const block of srt.replace(/\r/g, "").split(/\n\s*\n/)) {
+    const lines = block.trim().split("\n");
+    const at = lines.findIndex((l) => l.includes("-->"));
+    const m = /(\d+):(\d+):(\d+)[,.](\d+)/.exec(lines[at] ?? "");
+    if (!m) continue;
+    const text = lines.slice(at + 1).join(" ").replace(/<[^>]*>/g, "").trim();
+    if (text) out.push({ text, startMs: String(((Number(m[1]) * 60 + Number(m[2])) * 60 + Number(m[3])) * 1000 + Number(m[4])) });
+  }
+  return out;
+}
+
+/**
+ * One page of a channel's videos, in ScrapeCreators' shape whichever vendor gave it.
+ * @param {"scrapecreators" | "youtube"} via @param {Function} call @param {any} param @param {string} token
+ */
+async function videoPage(via, call, param, token) {
+  if (via !== "youtube") return call("/v1/youtube/channel-videos", { ...param, sort: "latest", ...(token ? { continuationToken: token } : {}) });
+  // A channel's uploads are the playlist with its id's UC turned to UU.
+  const page = await call("/youtube/v3/playlistItems", { part: "snippet,contentDetails", playlistId: `UU${param.channelId.slice(2)}`, maxResults: "50", ...(token ? { pageToken: token } : {}) });
+  // Deleted and private videos have no publish date here.
+  const items = (page?.items ?? []).filter((/** @type {any} */ i) => i?.contentDetails?.videoPublishedAt);
+  const ids = items.map((/** @type {any} */ i) => i.contentDetails.videoId);
+  const lengths = ids.length ? (await call("/youtube/v3/videos", { part: "contentDetails", id: ids.join(","), maxResults: "50" }))?.items ?? [] : [];
+  const seconds = new Map(lengths.map((/** @type {any} */ v) => [v.id, isoSeconds(v.contentDetails?.duration)]));
+  return {
+    videos: items.map((/** @type {any} */ i) => ({ id: i.contentDetails.videoId, title: i.snippet?.title, publishedTime: i.contentDetails.videoPublishedAt, lengthSeconds: seconds.get(i.contentDetails.videoId) })),
+    continuationToken: page?.nextPageToken,
+  };
+}
+
+/** The channel signed in to the youtube connection, as a target to list. @param {Function} call */
+async function mine(call) {
+  const me = (await call("/youtube/v3/channels", { part: "snippet", mine: "true" }))?.items?.[0];
+  if (!me?.id) fail("sources list: the account signed in to the youtube connection has no channel", `sign in with the account that owns the channel: ${CONNECT_YT}`);
+  const key = parseChannel(me.snippet?.customUrl ?? "")?.key ?? me.id;
+  return { key, param: { channelId: me.id }, via: /** @type {const} */ ("youtube"), title: me.snippet?.title };
+}
+
+/**
+ * A video's transcript and details, in ScrapeCreators' shape whichever vendor gave them.
+ * @param {"scrapecreators" | "youtube"} via @param {Function} call @param {any} video @param {string} [language]
+ */
+const fetchers = (via, call, video, language) =>
+  via === "youtube"
+    ? {
+        async transcript() {
+          const tracks = (await call("/youtube/v3/captions", { part: "snippet", videoId: video.id }))?.items ?? [];
+          const fits = (/** @type {any} */ t) => !language || t.snippet?.language === language || t.snippet?.language?.startsWith(`${language}-`);
+          // The channel's own captions before YouTube's automatic ones.
+          const track = tracks.filter(fits).sort((/** @type {any} */ x, /** @type {any} */ y) => Number(x.snippet?.trackKind === "asr") - Number(y.snippet?.trackKind === "asr"))[0];
+          if (!track) return null;
+          const segments = parseSrt(await call(`/youtube/v3/captions/${encodeURIComponent(track.id)}`, { tfmt: "srt" }, { text: true }));
+          return segments.length ? { transcript: segments, language: track.snippet?.language } : null;
+        },
+        async details() {
+          const v = (await call("/youtube/v3/videos", { part: "snippet,contentDetails", id: video.id }))?.items?.[0];
+          if (!v) throw new Skip("YouTube has no such video");
+          const sn = v.snippet ?? {};
+          const seconds = isoSeconds(v.contentDetails?.duration);
+          return { title: sn.title, publishDate: sn.publishedAt, durationMs: seconds ? seconds * 1000 : undefined, description: sn.description, keywords: sn.tags, channel: { title: sn.channelTitle } };
+        },
+      }
+    : {
+        transcript: async () => {
+          const t = await call("/v1/youtube/video/transcript", { url: video.url, ...(language ? { language } : {}) });
+          return Array.isArray(t?.transcript) && t.transcript.length ? t : null;
+        },
+        details: () => call("/v1/youtube/video", { url: video.url }),
+      };
 
 const fileOf = (/** @type {string} */ key) => join("sources", `${key}.json`);
 
@@ -156,7 +287,7 @@ function chosen(rest, at) {
   if (!rest.length) {
     const all = knownChannels();
     if (!all.length) fail(`${at}: no channels in sources/ yet`, LISTED);
-    return all.map((key) => ({ key, param: loadChannel(key).param }));
+    return all.map((key) => { const c = loadChannel(key); return { key, param: c.param, via: c.via }; });
   }
   const parsed = parseChannel(rest[0]);
   if (!parsed) misused(`${at}: ${rest[0]} is not a channel; give @handle, a channel URL or a UC... id`, LISTED);
@@ -222,15 +353,19 @@ function scopeFrom(/** @type {any} */ a, /** @type {any} */ before) {
 /** @param {any} a @param {string[]} rest */
 async function list(a, rest) {
   const pagesAllowed = wholeNumber(a, "max-pages", "sources list");
-  const targets = chosen(rest, "sources list");
+  if (has(a, "mine") && rest.length) misused("sources list: --mine is the connected account's own channel; give no channel with it", "node scripts/sources.mjs list --mine");
+  const spent = { credits: 0, units: 0 };
+  const callOf = clients(spent);
+  /** @type {{ key: string, param: any, via?: "scrapecreators" | "youtube", title?: string }[]} */
   scopeFrom(a, null);
-  const { call, spent } = client();
+  const targets = has(a, "mine") ? [await mine(callOf("youtube"))] : chosen(rest, "sources list");
+  for (const t of targets) callOf(viaOf(t));
   takeLock("sources list");
   const lines = [];
   const problems = [];
   let nextChannel = "";
-  const summary = () => `${targets.length} channel${targets.length === 1 ? "" : "s"}, ${spent.credits} credits spent`;
-  for (const { key, param } of targets) {
+  const summary = () => `${targets.length} channel${targets.length === 1 ? "" : "s"}, ${spentText(spent)}`;
+  for (const { key, param, via = "scrapecreators", title } of targets) {
     const before = loadChannel(key);
     const known = new Map((before?.videos ?? []).map((/** @type {any} */ v) => [v.id, v]));
     const seen = [];
@@ -243,7 +378,7 @@ async function list(a, rest) {
     let failure = null;
     try {
       while (true) {
-        const page = await call("/v1/youtube/channel-videos", { ...param, sort: "latest", ...(token ? { continuationToken: token } : {}) });
+        const page = await videoPage(via, callOf(via), param, token);
         pages++;
         const got = page?.videos ?? [];
         const videos = got.filter((/** @type {any} */ v) => /^[\w-]+$/.test(v?.id ?? "") && !seenIds.has(v.id));
@@ -290,7 +425,7 @@ async function list(a, rest) {
     const gone = channel.videos.filter((/** @type {any} */ v) => v.gone).length;
     const out = channel.videos.filter((/** @type {any} */ v) => leftOut(channel, v)).length;
     lines.push(`${key}: ${channel.videos.length} videos, ${hours(channel.videos)} hours; ${channel.added} new${gone ? `, ${gone} gone` : ""}${out ? `, ${out} left out by scope` : ""}${channel.complete ? "" : `, more on later pages (first ${pages} read)`}`);
-    lines.push(`  ${fileOf(key)}: ${pending.length} pending, about ${pending.length * 2} credits to fetch`);
+    lines.push(`  ${fileOf(key)}: ${pending.length} pending, ${via === "youtube" ? `through YouTube at about ${YT_PER_DAY} a day` : `about ${pending.length * 2} credits to fetch`}`);
     if (failure) problems.push(`${key}: ${failure instanceof Error ? failure.message : failure}; what was listed is kept`);
     nextChannel = key;
     delete channel.added;
@@ -317,7 +452,7 @@ async function list(a, rest) {
       if (scope.language !== before?.leave_out?.language) {
         for (const v of [...fresh, ...older]) if (v.state === "no_captions") v.state = "pending";
       }
-      const record = { ...before, kind: "youtube", channel: key, param, listed_at: new Date().toISOString(), complete: complete || (!!before?.complete && caughtUp), leave_out: scope, videos: [...fresh, ...older] };
+      const record = { ...before, ...(via === "youtube" ? { via } : {}), ...(title && !before?.title ? { title } : {}), kind: "youtube", channel: key, param, listed_at: new Date().toISOString(), complete: complete || (!!before?.complete && caughtUp), leave_out: scope, videos: [...fresh, ...older] };
       saveChannel(record);
       return { ...record, added };
     }
@@ -356,10 +491,14 @@ async function fetchAll(a, rest) {
     done("sources fetch", "nothing pending, left alone", { lines: [`${count("fetched")} fetched, ${count("no_captions")} with no captions${stuck ? `, ${stuck} failed ${MAX_ATTEMPTS} times (name one with --id to try again)` : ""}`], next: "ls raw/youtube" });
     return;
   }
-  const { call, spent } = client();
+  const spent = { credits: 0, units: 0 };
+  const callOf = clients(spent);
+  for (const w of work) callOf(viaOf(w.channel));
   if (!has(a, "confirm")) {
     const again = ["node scripts/sources.mjs fetch", rest[0] ? targets[0].key : "", has(a, "limit") ? `--limit ${limit}` : "", ...ids.map((i) => `--id ${i}`), has(a, "max-minutes") ? `--max-minutes ${minutes}` : ""].filter(Boolean).join(" ");
-    done("sources fetch", `would fetch ${work.length} videos, ${hours(work.map((w) => w.video))} hours, about ${work.length * 2} credits`, { waits: again });
+    const viaYouTube = work.filter((w) => w.channel.via === "youtube").length;
+    const cost = [work.length > viaYouTube ? `about ${(work.length - viaYouTube) * 2} credits` : "", viaYouTube ? `${viaYouTube} through YouTube at about ${YT_PER_DAY} a day` : ""].filter(Boolean).join(", ");
+    done("sources fetch", `would fetch ${work.length} videos, ${hours(work.map((w) => w.video))} hours, ${cost}`, { waits: again });
     return;
   }
   takeLock("sources fetch");
@@ -374,7 +513,7 @@ async function fetchAll(a, rest) {
     while (queue.length && !halt && Date.now() < deadline) {
       const { channel, video } = /** @type {any} */ (queue.shift());
       try {
-        const outcome = await fetchOne(channel, video, call, problems);
+        const outcome = await fetchOne(channel, video, callOf(viaOf(channel)), problems);
         counts[outcome]++;
         delete video.error;
         delete video.attempts;
@@ -395,7 +534,7 @@ async function fetchAll(a, rest) {
   };
   await Promise.all(Array.from({ length: WORKERS }, worker));
 
-  const summary = `${counts.fetched} fetched, ${counts.kept} already on disk, ${counts.no_captions} with no captions, ${counts.failed} failed; ${spent.credits} credits spent`;
+  const summary = `${counts.fetched} fetched, ${counts.kept} already on disk, ${counts.no_captions} with no captions, ${counts.failed} failed; ${spentText(spent)}`;
   if (halt) fail(`sources fetch: stopped: ${/** @type {Halt} */ (halt).message}\n  ${summary}; progress is kept`, /** @type {Halt} */ (halt).tryCmd);
   const left = every.filter((w) => isPending(w.channel, w.video)).length;
   const lines = [...problems.slice(0, 10), ...(problems.length > 10 ? [`${problems.length - 10} more; each video's error is in sources/`] : [])];
@@ -405,7 +544,7 @@ async function fetchAll(a, rest) {
   done("sources fetch", summary, { lines, next: "ls raw/youtube" });
 }
 
-/** One video into raw/. Transcript first: it costs nothing when there are no captions. */
+/** One video into raw/. Transcript first: on ScrapeCreators it costs nothing when there are no captions. */
 async function fetchOne(channel, video, call, notes) {
   const dir = join("raw", "youtube", channel.channel);
   const onDisk = existsSync(dir) ? readdirSync(dir).find((f) => f.endsWith(`-${video.id}.md`)) : undefined;
@@ -414,9 +553,9 @@ async function fetchOne(channel, video, call, notes) {
     video.file = join(dir, onDisk);
     return "kept";
   }
-  const language = channel.leave_out?.language;
-  const transcript = await call("/v1/youtube/video/transcript", { url: video.url, ...(language ? { language } : {}) });
-  if (!Array.isArray(transcript?.transcript) || !transcript.transcript.length) {
+  const get = fetchers(viaOf(channel), call, video, channel.leave_out?.language);
+  const transcript = await get.transcript();
+  if (!transcript) {
     video.state = "no_captions";
     return "no_captions";
   }
@@ -425,7 +564,7 @@ async function fetchOne(channel, video, call, notes) {
   /** @type {Halt | null} */
   let halt = null;
   try {
-    details = (await call("/v1/youtube/video", { url: video.url })) ?? {};
+    details = (await get.details()) ?? {};
   } catch (e) {
     if (e instanceof Halt) halt = e;
     else notes.push(`${video.id}: kept the transcript without its details (${e instanceof Error ? e.message : e})`);
@@ -548,9 +687,9 @@ async function main() {
     parseArgs([]);
     misused("sources: it prints text, no --json", "node scripts/sources.mjs --help");
   }
-  const a = parseArgs(argv, { bare: ["full"] });
+  const a = parseArgs(argv, { bare: ["full", "mine"] });
   const [cmd, ...rest] = a._;
-  usage(a, cmd, ["list", "fetch", "crawl"], HELP, "sources", { list: ["max-pages", "full", "since", "min-minutes", "language"], fetch: ["limit", "id", "max-minutes", "confirm"], crawl: ["max-pages"] });
+  usage(a, cmd, ["list", "fetch", "crawl"], HELP, "sources", { list: ["max-pages", "full", "since", "min-minutes", "language", "mine"], fetch: ["limit", "id", "max-minutes", "confirm"], crawl: ["max-pages"] });
   if (cmd === "list") await list(a, rest);
   else if (cmd === "crawl") crawl(a, rest);
   else await fetchAll(a, rest);

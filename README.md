@@ -10,7 +10,7 @@ Installed with one click on Task & Tool, or cloned into a repository of your own
 ## How it works
 
 1. **Read.** `scripts/sources.mjs` lists a channel and fetches transcripts through ScrapeCreators,
-   or crawls a site with `tt-crawl`. Nothing spends without a yes.
+   or the owner's own channel through YouTube, or crawls a site with `tt-crawl`. Nothing spends without a yes.
 2. **Distill.** One fresh AI run rewrites each source into a dense private document, and a second
    fresh run corrects it against the source. `scripts/check-distilled.mjs` catches quotes, names and
    numbers the source does not have, and stretches that were skimmed.
@@ -38,7 +38,7 @@ splitting instead.
 
 ## Off Task & Tool
 
-Set `SCRAPECREATORS_API_KEY`, run `npm install`, and follow `PROCESS.md` with Codex or Claude Code in the
+Set `SCRAPECREATORS_API_KEY` (or `YOUTUBE_ACCESS_TOKEN`, a Google sign-in token, for your own channel), run `npm install`, and follow `PROCESS.md` with Codex or Claude Code in the
 folder. The pipeline works without its jobs: run `node scripts/pipeline.mjs tick` yourself. `npm run build`
 writes `dist/`, which any static host can serve.
 

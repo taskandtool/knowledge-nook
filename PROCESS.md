@@ -28,6 +28,10 @@ Agree with the owner, and record:
 owner the number of sources, total hours, and the expected credits, AI cost and time.
 Wait for a yes.
 
+When the channel is the owner's own, `list --mine` reads it through the youtube connection
+instead: no credits, but YouTube allows captions for about 40 videos a day, so a big channel
+takes days. Any other channel needs ScrapeCreators.
+
 ### 3. Calibrate on a sample
 
 Before spending on the whole channel, run the real pipeline on about 20 sources spread

@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { done, fail, flag, flags, has, misused, noMore, parseArgs, usage } from "../src/data/cli.mjs";
 import { SPLIT_MOMENTS, reusedLinks, slugOf, topicEntries, topicHash } from "./build-index.mjs";
-import { isPending, knownChannels, knownSites, loadChannel, newPages } from "./sources.mjs";
+import { isPending, knownChannels, knownSites, loadChannel, newPages, YT_PER_DAY } from "./sources.mjs";
 
 const HELP = `usage: node scripts/pipeline.mjs <command>
 
@@ -317,9 +317,13 @@ function queue(/** @type {any} */ a, /** @type {string[]} */ rest) {
   }
 
   const isPages = has(a, "pages");
-  const toFetch = chosen.filter((x) => x.kind === "youtube" && !x.file).length;
+  const fetching = chosen.filter((x) => x.kind === "youtube" && !x.file);
+  // The owner's own channel comes through YouTube, which charges no credits but allows about 40 a day.
+  const ownChannels = new Set(knownChannels().filter((key) => loadChannel(key)?.via === "youtube"));
+  const viaYouTube = fetching.filter((x) => ownChannels.has(x.channel)).length;
+  const toFetch = fetching.length - viaYouTube;
   const hours = (chosen.reduce((n, x) => n + (x.seconds || 0), 0) / 3600).toFixed(1);
-  const cost = isPages ? `${chosen.length * 2} AI runs (write and verify)` : `about ${toFetch * 2} credits to fetch ${toFetch}, ${hours} hours of video, ${chosen.length * 3} AI runs (notes, moments and align), then 2 runs for each ${has(a, "new") ? "page the new moments touch, or new topic that passes the gate" : "written page the new moments touch"}`;
+  const cost = isPages ? `${chosen.length * 2} AI runs (write and verify)` : `about ${toFetch * 2} credits to fetch ${toFetch}${viaYouTube ? `, ${viaYouTube} more through YouTube at about ${YT_PER_DAY} a day` : ""}, ${hours} hours of video, ${chosen.length * 3} AI runs (notes, moments and align), then 2 runs for each ${has(a, "new") ? "page the new moments touch, or new topic that passes the gate" : "written page the new moments touch"}`;
   if (!confirmed) {
     const flagsNow = [sample !== undefined ? `--sample ${sample}` : "", has(a, "all") ? "--all" : "", has(a, "new") ? "--new" : "", isPages ? "--pages" : "", ...names.map((n) => `--topic "${n}"`)].filter(Boolean).join(" ");
     console.log(`pipeline queue: would add ${chosen.length} ${isPages ? "page" : "source"}${chosen.length === 1 ? "" : "s"}\n  ${cost}\n${chosen.slice(0, 8).map((x) => `  ${x.name ?? x.file ?? x.id}`).join("\n")}${chosen.length > 8 ? `\n  ${chosen.length - 8} more` : ""}\n\nNothing was queued. If the owner agreed: node scripts/pipeline.mjs queue ${flagsNow} --confirm`);

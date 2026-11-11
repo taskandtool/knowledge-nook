@@ -5,8 +5,9 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseChannel, renderRaw } from "../scripts/sources.mjs";
+import { isoSeconds, parseChannel, parseSrt, renderRaw } from "../scripts/sources.mjs";
 import { fakeVendor } from "./fake-scrapecreators.mjs";
+import { fakeYouTube, upload } from "./fake-youtube.mjs";
 
 const script = fileURLToPath(new URL("../scripts/sources.mjs", import.meta.url));
 
@@ -597,3 +598,126 @@ test("an own key works under either spelling, and goes in ScrapeCreators' key he
   }
 });
 
+
+// The owner's own channel, through the youtube connection.
+const OWN = `UC${"a".repeat(22)}`;
+const SRT = "1\n00:00:00,000 --> 00:00:04,500\nWelcome <i>back</i>\n\n2\n00:01:01,250 --> 00:01:05,000\nTwo lines\nof caption\n\n";
+const ownChannel = (extra = {}) => ({
+  channel: { id: OWN, customUrl: "@MyChan", title: "My Channel" },
+  pages: [[upload("v1", "2026-10-02T10:00:00Z"), upload("v2"), { snippet: { title: "Deleted video" }, contentDetails: { videoId: "gone1" } }], [upload("v3", "2026-09-01T10:00:00Z")]],
+  videos: {
+    v1: { snippet: { title: "One", publishedAt: "2026-10-02T10:00:00Z", description: "About one", tags: ["a"], channelTitle: "My Channel" }, contentDetails: { duration: "PT1H2M3S" } },
+    v2: { snippet: { title: "Two", publishedAt: "2026-10-01T10:00:00Z", channelTitle: "My Channel" }, contentDetails: { duration: "PT10M" } },
+    v3: { snippet: { title: "Three", publishedAt: "2026-09-01T10:00:00Z", channelTitle: "My Channel" }, contentDetails: { duration: "PT30S" } },
+  },
+  tracks: {
+    v1: [{ id: "auto1", snippet: { language: "en", trackKind: "asr" } }, { id: "own1", snippet: { language: "en-US", trackKind: "standard" } }],
+    v2: [],
+    v3: [{ id: "fr3", snippet: { language: "fr", trackKind: "standard" } }],
+  },
+  srt: { own1: SRT, auto1: "1\n00:00:00,000 --> 00:00:01,000\nautomatic\n", fr3: SRT },
+  ...extra,
+});
+
+test("captions and durations: SRT becomes segments, ISO durations become seconds", () => {
+  assert.deepEqual(parseSrt(SRT), [{ text: "Welcome back", startMs: "0" }, { text: "Two lines of caption", startMs: "61250" }]);
+  assert.equal(isoSeconds("PT1H2M3S"), 3723);
+  assert.equal(isoSeconds("P1DT1M"), 86460);
+  assert.equal(isoSeconds("nonsense"), undefined);
+});
+
+test("--mine lists the connected account's channel through YouTube, with no credits", async () => {
+  const yt = await fakeYouTube(ownChannel());
+  const cwd = folder();
+  const r = await run(cwd, ["list", "--mine"], gateway(yt));
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /mychan: 3 videos/);
+  assert.match(r.stdout, /through YouTube at about 40 a day/);
+  assert.match(r.stdout, /0 credits spent, 5 YouTube units used/, "the channel, then a list and a details call per page");
+  const c = state(cwd, "mychan");
+  assert.equal(c.via, "youtube");
+  assert.equal(c.title, "My Channel");
+  assert.deepEqual(c.param, { channelId: OWN });
+  assert.deepEqual(c.videos.map((v) => [v.id, v.seconds, v.published]), [["v1", 3723, "2026-10-02"], ["v2", 600, "2026-10-01"], ["v3", 30, "2026-09-01"]], "a deleted video is left out");
+  assert.equal(yt.calls[1].query.playlistId, `UU${OWN.slice(2)}`, "the uploads playlist");
+  assert.ok(yt.calls.every((call) => call.auth === "Bearer machine-token"), "the gateway gets the machine token, never a Google one");
+  // A plain list later stays on YouTube.
+  const again = await run(cwd, ["list"], gateway(yt));
+  assert.equal(again.status, 0, again.stderr);
+  assert.ok(yt.calls.filter((call) => call.path === "/youtube/v3/playlistItems").length >= 3);
+  await yt.close();
+});
+
+test("a YouTube channel's fetch writes the channel's own captions, and says what has none", async () => {
+  const yt = await fakeYouTube(ownChannel());
+  const cwd = folder();
+  assert.equal((await run(cwd, ["list", "--mine"], gateway(yt))).status, 0);
+  const preview = await run(cwd, ["fetch", "mychan"], gateway(yt));
+  assert.match(preview.stdout, /would fetch 3 videos, .*3 through YouTube at about 40 a day/);
+  const r = await run(cwd, ["fetch", "mychan", "--confirm"], gateway(yt));
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /2 fetched, 0 already on disk, 1 with no captions, 0 failed; 0 credits spent, \d+ YouTube units used/);
+  const raw = readFileSync(join(cwd, "raw/youtube/mychan/2026-10-02-v1.md"), "utf8");
+  assert.match(raw, /title: "One"/);
+  assert.match(raw, /channel: "My Channel"/);
+  assert.match(raw, /duration: 01:02:03/);
+  assert.match(raw, /About one/);
+  assert.match(raw, /L0001 00:00:00 Welcome back\nL0002 00:01:01 Two lines of caption/, "the channel's own track, not the automatic one");
+  assert.ok(!yt.calls.some((call) => call.path === "/youtube/v3/captions/auto1"));
+  assert.equal(state(cwd, "mychan").videos.find((v) => v.id === "v2").state, "no_captions");
+  await yt.close();
+});
+
+test("a YouTube channel's caption language is a choice among its tracks", async () => {
+  const yt = await fakeYouTube(ownChannel());
+  const cwd = folder();
+  assert.equal((await run(cwd, ["list", "--mine", "--language", "fr"], gateway(yt))).status, 0);
+  const r = await run(cwd, ["fetch", "mychan", "--confirm"], gateway(yt));
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /1 fetched, 0 already on disk, 2 with no captions/);
+  assert.ok(existsSync(join(cwd, "raw/youtube/mychan/2026-09-01-v3.md")));
+  await yt.close();
+});
+
+test("YouTube's daily quota stops the run, keeps progress and says when to carry on", async () => {
+  const yt = await fakeYouTube(ownChannel({ error: (path) => (path === "/youtube/v3/captions/fr3" ? { status: 403, reason: "quotaExceeded" } : undefined) }));
+  const cwd = folder();
+  assert.equal((await run(cwd, ["list", "--mine"], gateway(yt))).status, 0);
+  const r = await run(cwd, ["fetch", "mychan", "--confirm"], gateway(yt));
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /sources fetch: stopped: YouTube's daily quota is used up/);
+  assert.match(r.stderr, /after midnight Pacific time/);
+  assert.notEqual(state(cwd, "mychan").videos.find((v) => v.id === "v3").state, "failed", "the quota is no video's fault");
+  await yt.close();
+});
+
+test("a sign-in without the captions permission says to connect again with it", async () => {
+  const yt = await fakeYouTube(ownChannel({ error: (path) => (path === "/youtube/v3/captions" ? { status: 403, reason: "insufficientPermissions" } : undefined) }));
+  const cwd = folder();
+  assert.equal((await run(cwd, ["list", "--mine"], gateway(yt))).status, 0);
+  const r = await run(cwd, ["fetch", "mychan", "--confirm"], gateway(yt));
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /does not allow reading captions/);
+  assert.match(r.stderr, /youtube\.force-ssl/);
+  await yt.close();
+});
+
+test("a video the account cannot edit fails alone; the rest carry on", async () => {
+  const yt = await fakeYouTube(ownChannel({ error: (path) => (path === "/youtube/v3/captions/own1" ? { status: 403, reason: "forbidden" } : undefined) }));
+  const cwd = folder();
+  assert.equal((await run(cwd, ["list", "--mine"], gateway(yt))).status, 0);
+  const r = await run(cwd, ["fetch", "mychan", "--confirm"], gateway(yt));
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /1 fetched, .*1 failed/);
+  assert.match(r.stderr, /v1: YouTube answered 403/);
+  await yt.close();
+});
+
+test("--mine without a youtube connection names the ask, and takes no channel", async () => {
+  const r = await run(folder(), ["list", "--mine"]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /no YouTube connection/);
+  assert.match(r.stderr, /request-connection youtube/);
+  const both = await run(folder(), ["list", "@chan", "--mine"]);
+  assert.equal(both.status, 2);
+});

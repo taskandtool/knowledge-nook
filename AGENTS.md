@@ -34,6 +34,7 @@ node scripts/pipeline.mjs next page    # claims one page
 node scripts/pipeline.mjs done <file>  # marks it once its check passes
 node scripts/pipeline.mjs queue        # adds work; previews, and --confirm needs the owner's yes
 node scripts/sources.mjs list @channel # a channel's videos, hours and credits
+node scripts/sources.mjs list --mine   # the owner's own channel, through the youtube connection
 node scripts/sources.mjs crawl <url>   # a website's pages into raw/web/
 node scripts/check-distilled.mjs <file>
 node scripts/check-moments.mjs <file>
