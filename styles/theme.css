@@ -2,19 +2,19 @@
    palette is off, so markup can only use these. To change the look, change them here. */
 @theme {
   --color-*: initial;
-  --color-canvas: #f6f7f4;
+  --color-canvas: #ffffff;
   --color-surface: #ffffff;
-  --color-panel: #e8ebe4;
-  --color-ink: #15191c;
-  --color-ink-2: #4c5459;
-  --color-ink-3: #5f676c;
-  --color-accent: #a8341a;
+  --color-panel: #f1f1f0;
+  --color-ink: #111111;
+  --color-ink-2: #474747;
+  --color-ink-3: #5c5c5c;
+  --color-accent: #b3261e;
   --color-accent-ink: #ffffff;
-  --color-tile: #203a35;
-  --color-tile-ink: #f3f6f1;
-  --color-media-shade: rgb(21 25 28 / 0.12);
-  --color-line: rgb(21 25 28 / 0.14);
-  --color-line-strong: rgb(21 25 28 / 0.34);
+  --color-tile: #111111;
+  --color-tile-ink: #ffffff;
+  --color-media-shade: rgb(17 17 17 / 0.12);
+  --color-line: rgb(17 17 17 / 0.12);
+  --color-line-strong: rgb(17 17 17 / 0.32);
 
   --font-display: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Source Serif 4", ui-serif, Georgia, serif;

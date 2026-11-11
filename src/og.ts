@@ -26,11 +26,11 @@ const el = (type: string, style: Record<string, unknown>, children?: unknown, ex
 export async function renderShareImage({ title, siteName, picture, tall }: { title: string; siteName: string; picture: Uint8Array; tall?: boolean }) {
   const mime = picture[0] === 0x89 ? "image/png" : "image/jpeg";
   const size = tall ? { width: 1608, height: 1206, left: -204, top: -288 } : { width: WIDTH, height: 675, left: 0, top: -22 };
-  const tree = el("div", { display: "flex", position: "relative", width: WIDTH, height: HEIGHT, backgroundColor: "#203a35", color: "#ffffff", fontFamily: "Display" }, [
+  const tree = el("div", { display: "flex", position: "relative", width: WIDTH, height: HEIGHT, backgroundColor: "#111111", color: "#ffffff", fontFamily: "Display" }, [
     el("img", { position: "absolute", ...size }, undefined, { src: `data:${mime};base64,${Buffer.from(picture).toString("base64")}`, width: size.width, height: size.height }),
     el("div", { position: "absolute", left: 0, top: 0, width: WIDTH, height: HEIGHT, backgroundImage: "linear-gradient(to top, rgba(12,16,16,0.97), rgba(12,16,16,0.82) 55%, rgba(12,16,16,0.62))" }),
     el("div", { position: "absolute", left: 64, top: 56, display: "flex", alignItems: "center", fontSize: 30, fontWeight: 700 }, [
-      el("div", { display: "flex", alignItems: "center", justifyContent: "center", width: 52, height: 52, marginRight: 16, borderRadius: 12, backgroundColor: "#203a35", color: "#f3f6f1", fontSize: 21 }, initialsOf(siteName)),
+      el("div", { display: "flex", alignItems: "center", justifyContent: "center", width: 52, height: 52, marginRight: 16, borderRadius: 12, backgroundColor: "#111111", color: "#ffffff", fontSize: 21 }, initialsOf(siteName)),
       el("div", {}, siteName),
     ]),
     el("div", { position: "absolute", left: 64, bottom: 60, width: WIDTH - 128, fontSize: title.length > 60 ? 64 : 84, lineHeight: 1.06, fontWeight: 800, letterSpacing: "-0.02em", lineClamp: 3 }, title),

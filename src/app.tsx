@@ -54,7 +54,7 @@ export function paletteData(site: Site) {
 /** The tab's little picture: the site's initials in the dark square the header uses. */
 export function favicon(site: Site) {
   const text = initialsOf(site.settings.name).replace(/&/g, "&amp;").replace(/</g, "&lt;");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#203a35"/><text x="16" y="21.5" text-anchor="middle" font-family="system-ui,sans-serif" font-size="15" font-weight="700" fill="#f3f6f1">${text}</text></svg>\n`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#111111"/><text x="16" y="21.5" text-anchor="middle" font-family="system-ui,sans-serif" font-size="15" font-weight="700" fill="#ffffff">${text}</text></svg>\n`;
 }
 
 export const robots = (site: Site) => `User-agent: *\nAllow: /\nDisallow: /pagefind/\n${site.settings.url ? `Sitemap: ${site.settings.url}/sitemap.xml\n` : ""}`;
