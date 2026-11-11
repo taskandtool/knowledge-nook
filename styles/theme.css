@@ -12,6 +12,7 @@
   --color-accent-ink: #ffffff;
   --color-tile: #203a35;
   --color-tile-ink: #f3f6f1;
+  --color-media-shade: rgb(21 25 28 / 0.12);
   --color-line: rgb(21 25 28 / 0.14);
   --color-line-strong: rgb(21 25 28 / 0.34);
 
@@ -21,16 +22,32 @@
 
   --text-page: clamp(2.25rem, 5vw, 3.5rem);
   --text-page--line-height: 1.04;
+  --text-page-long: clamp(1.875rem, 3.75vw, 3rem);
+  --text-page-long--line-height: 1.12;
   --text-title: clamp(1.4rem, 2.2vw, 1.75rem);
   --text-title--line-height: 1.2;
-  --text-lede: clamp(1.15rem, 1.6vw, 1.35rem);
+  --text-lede: clamp(1.1875rem, 1.1rem + 0.4vw, 1.375rem);
   --text-lede--line-height: 1.45;
   --text-copy: 1.125rem;
   --text-copy--line-height: 1.65;
+  --text-reading: clamp(1.125rem, 1.05rem + 0.25vw, 1.25rem);
+  --text-reading--line-height: 1.65;
+  --text-preview: 1.0625rem;
+  --text-preview--line-height: 1.55;
+  --text-moment: clamp(1.5rem, 2.3vw, 1.9rem);
+  --text-moment--line-height: 1.16;
+  --text-evidence: 1.3125rem;
+  --text-evidence--line-height: 1.45;
+  --text-rail: 1rem;
+  --text-rail--line-height: 1.45;
   --text-small: 0.9375rem;
   --text-small--line-height: 1.45;
 
-  --container-read: 44rem;
+  --container-read: 38rem;
+  --container-heading: 64rem;
+  --container-intro: 46rem;
   --container-wide: 76rem;
+  --spacing-reading-gap: clamp(2rem, 4vw, 4rem);
+  --spacing-reference-target: 1.5rem;
   --radius-tile: 0.25rem;
 }

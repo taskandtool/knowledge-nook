@@ -56,21 +56,24 @@ export function TopicMap({ groups, pictureOf }: { groups: Group[]; pictureOf?: (
 }
 
 const dayOf = (d: string) => Date.parse(`${d}T00:00:00Z`);
-const LABEL_GAP = 0.1;
+/** A date label's width as a share of the line, wide enough for "Aug 2026" on the narrowest screen that shows it. */
+const LABEL_WIDTH = 0.14;
 
-/** What each dot says: a short date above the line, below it when its neighbour is close, and nothing when both are taken. */
+/** What each dot says: a short date above the line, below it when its neighbour's label is in the way, and nothing when both are taken. */
 export function timelineMarks(dates: string[], language = "en") {
   const days = dates.map(dayOf);
   const span = days[days.length - 1] - days[0] || 1;
   const sameYear = new Set(dates.map((d) => d.slice(0, 4))).size === 1;
-  const lastAt = [-Infinity, -Infinity];
-  return days.map((day, i) => {
+  const endOf = [-Infinity, -Infinity];
+  return days.map((day) => {
     const at = (day - days[0]) / span;
-    const free = [0, 1].find((r) => at - lastAt[r] >= LABEL_GAP);
+    const align = at < 0.06 ? "start" : at > 0.94 ? "end" : "middle";
+    const left = align === "start" ? at : align === "end" ? at - LABEL_WIDTH : at - LABEL_WIDTH / 2;
+    const free = [0, 1].find((r) => left >= endOf[r]);
     if (free === undefined) return { text: "", row: 0, align: "middle" };
-    lastAt[free] = at;
+    endOf[free] = left + LABEL_WIDTH;
     const options: Intl.DateTimeFormatOptions = sameYear ? { month: "short", day: "numeric", timeZone: "UTC" } : { month: "short", year: "numeric", timeZone: "UTC" };
-    return { text: new Date(day).toLocaleDateString(language, options), row: free, align: at < 0.06 ? "start" : at > 0.94 ? "end" : "middle" };
+    return { text: new Date(day).toLocaleDateString(language, options), row: free, align };
   });
 }
 export const niceDate = (d: string, language = "en") => {

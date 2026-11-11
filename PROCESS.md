@@ -1,8 +1,7 @@
 # Knowledge Nook: process
 
 How the app runs once it is built: starting a channel, keeping it current, and keeping
-the site healthy. `ARCHITECTURE.md` describes the scripts, skills and jobs named here,
-and the order we build them in.
+the site healthy.
 
 The rules throughout:
 

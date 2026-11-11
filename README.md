@@ -21,8 +21,7 @@ Installed with one click on Task & Tool, or cloned into a repository of your own
    site serves, and only a person makes it public.
 
 `scripts/pipeline.mjs` runs all of this as recurring jobs on the machine, one item at a time.
-`SITE.md` holds the owner's rules for the subject. `ARCHITECTURE.md` is the design and `PROCESS.md` how
-it runs.
+`SITE.md` holds the owner's rules for the subject, and `PROCESS.md` says how it runs.
 
 ## Ideas not built
 

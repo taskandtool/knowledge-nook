@@ -80,6 +80,7 @@ const BRACKETED = new RegExp(String.raw`\(\s*(${LINK}(?:[,;]?\s*${LINK})*)\s*\)`
 export function renderWithNotes(markdown: string, resolve: Resolve) {
   const references: Reference[] = [];
   const numbers = new Map<string, number>();
+  let occurrence = 0;
   footnote = (href) => {
     const found = resolve(href);
     if (!found) return null;
@@ -89,7 +90,7 @@ export function renderWithNotes(markdown: string, resolve: Resolve) {
       numbers.set(href, n);
       references.push({ n, ...found });
     }
-    return `<sup class="fn" data-pagefind-ignore><a href="#fn-${n}" data-fn="${n}" data-to="${escapeHtml(encodeURI(found.path))}${found.at === null ? "" : `#t=${found.at}`}" aria-label="Source ${n}">${n}</a></sup>`;
+    return `<sup class="fn" data-pagefind-ignore><a href="#fn-${n}" data-fn="${n}" data-to="${escapeHtml(encodeURI(found.path))}${found.at === null ? "" : `#t=${found.at}`}" id="reference-${n}-${++occurrence}" aria-label="Source ${n}">${n}</a></sup>`;
   };
   try {
     const html = (marked.parse(markdown.replace(BRACKETED, "$1"), { async: false }) as string).replace(/\s+<sup class="fn"/g, '<sup class="fn"').replace(/<\/sup>\s*,?\s*<sup class="fn"/g, '</sup><sup class="fn"');

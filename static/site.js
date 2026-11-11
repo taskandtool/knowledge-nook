@@ -255,7 +255,7 @@ export function nearestMoment(seconds, at) {
   return best;
 }
 
-/** A footnote: a card on hover or focus, and a click goes to the source here. On touch, the first tap shows the card. */
+/** A footnote: hover or focus previews it; a click follows unless the topic player handles it. */
 function footnotes() {
   const marks = document.querySelectorAll("[data-fn]");
   if (!marks.length) return;
@@ -264,11 +264,9 @@ function footnotes() {
   card.hidden = true;
   card.setAttribute("role", "tooltip");
   document.body.append(card);
-  let shownFor = null;
   let leaving = 0;
   const hide = () => {
     card.hidden = true;
-    shownFor = null;
   };
   const show = (a) => {
     clearTimeout(leaving);
@@ -278,7 +276,6 @@ function footnotes() {
     const time = note.querySelector("[data-note-time]")?.outerHTML ?? "";
     card.innerHTML = `<div>${title} ${time}</div><div class="mt-1 font-body text-ink-2">${note.querySelector("[data-note-line]")?.innerHTML ?? ""}</div>`;
     card.hidden = false;
-    shownFor = a;
     const r = a.getBoundingClientRect();
     const left = Math.max(8, Math.min(r.left + scrollX - 16, scrollX + document.documentElement.clientWidth - card.offsetWidth - 8));
     const above = r.top - card.offsetHeight - 8;
@@ -293,17 +290,12 @@ function footnotes() {
   for (const a of marks) {
     a.addEventListener("pointerenter", (e) => e.pointerType === "mouse" && show(a));
     a.addEventListener("pointerleave", (e) => e.pointerType === "mouse" && later());
-    // Keyboard only: a tap also focuses, and that must not count as already seeing the card.
+    // Keyboard focus previews the source on hover-capable screens.
     a.addEventListener("focus", () => a.matches(":focus-visible") && !matchMedia("(hover: none)").matches && show(a));
     a.addEventListener("blur", later);
     a.addEventListener("click", (e) => {
-      if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-      const touch = e.pointerType === "touch" || matchMedia("(hover: none)").matches;
-      if (touch && shownFor !== a) {
-        e.preventDefault();
-        show(a);
-        return;
-      }
+      if (e.defaultPrevented) { hide(); return; }
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       e.preventDefault();
       location.href = a.dataset.to;
     });
@@ -343,84 +335,122 @@ export function momentAt(moments, second) {
   return found;
 }
 
-/** On a written page: the video being cited where you're reading, as a picture until it's played. */
+/** Beside a written page: the source cited where you're reading. A footnote click plays its moment here; on a phone a link leads back. */
 function readingRail() {
-  const frame = document.querySelector("[data-rail-frame]");
-  if (!frame) return;
+  const root = document.querySelector("[data-reading-rail]");
+  const panel = root?.querySelector("[data-evidence-panel]");
+  if (!panel) return;
   const noteOf = (a) => document.getElementById(`fn-${a.dataset.fn}`);
-  const marks = [...document.querySelectorAll("article [data-fn]")].filter((a) => noteOf(a)?.dataset.video);
+  const marks = [...document.querySelectorAll("article [data-fn]")].filter(noteOf);
   if (!marks.length) return;
-  const [thumb, title, time, now, text] = ["thumb", "title", "time", "now", "text"].map((n) => document.querySelector(`[data-rail-${n}]`));
-  const play = frame.querySelector("[data-rail-play]");
-  for (const url of new Set(marks.map((a) => noteOf(a).dataset.thumb))) new Image().src = url;
-  const pop = (el) => {
-    el.classList.remove("changing");
-    void el.offsetWidth;
-    el.classList.add("changing");
-  };
-  let shown = noteOf(marks[0]);
+  const wide = matchMedia("(min-width: 52rem)");
+  const frame = root.querySelector("[data-rail-frame]");
+  const play = root.querySelector("[data-rail-play]");
+  const [thumb, title, text] = ["thumb", "title", "text"].map((n) => root.querySelector(`[data-rail-${n}]`));
+  const back = root.querySelector("[data-rail-return]");
+  let shown = document.getElementById(`fn-${panel.dataset.evidenceCurrent}`);
   let playing = false;
-  const showVideo = (note) => {
-    title.textContent = note.dataset.title;
-    title.setAttribute("href", note.dataset.path);
-    if (playing) return;
-    play.setAttribute("href", note.dataset.to);
-    if (thumb.getAttribute("src") !== note.dataset.thumb) {
-      thumb.setAttribute("src", note.dataset.thumb);
-      pop(thumb);
-    }
+  let returnTo = null;
+  const stop = () => {
+    if (frame.querySelector("iframe")) frame.replaceChildren(...(play ? [play] : []));
+    playing = false;
   };
-  const show = (note) => {
-    if (note === shown) return;
+  const preview = (note) => {
     shown = note;
-    if (!playing) showVideo(note);
-    if (note.dataset.big && note.dataset.big !== text.textContent) {
-      text.textContent = note.dataset.big;
-      pop(now);
+    title.textContent = note.dataset.title;
+    title.title = note.dataset.title;
+    title.href = note.dataset.to;
+    frame.hidden = !note.dataset.video;
+    if (note.dataset.video && play) {
+      play.href = note.dataset.to;
+      play.setAttribute("aria-label", `Play ${note.dataset.title}`);
+      thumb.src = note.dataset.thumb;
     }
-    if (time) {
-      time.textContent = note.dataset.stamp ?? "";
-      time.setAttribute("href", note.dataset.to);
-    }
+    // A video speaks for itself; a written source shows its line.
+    const line = note.querySelector("[data-note-line]")?.textContent || note.dataset.big || "";
+    text.textContent = line;
+    text.hidden = !!note.dataset.video || !line;
   };
   const start = (note) => {
-    const src = seekUrl(note.dataset.video, note.dataset.at || 0);
-    let player = frame.querySelector("iframe");
-    if (!player) {
-      player = document.createElement("iframe");
+    stop();
+    root.setAttribute("data-evidence-selected", "");
+    preview(note);
+    if (note.dataset.video) {
+      const player = document.createElement("iframe");
       player.className = "h-full w-full";
-      player.allow = "autoplay; encrypted-media; picture-in-picture";
+      player.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
       player.allowFullscreen = true;
       player.title = note.dataset.title;
+      player.src = seekUrl(note.dataset.video, note.dataset.at || 0);
       frame.replaceChildren(player);
+      playing = true;
     }
-    player.src = src;
-    playing = false;
-    showVideo(note);
-    playing = true;
   };
-  for (const link of [play, time]) {
-    link?.addEventListener("click", (e) => {
-      if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+  const activate = (note, origin) => {
+    returnTo = { mark: origin, top: origin.getBoundingClientRect().top };
+    start(note);
+    const number = note.id.slice(3);
+    panel.setAttribute("aria-label", `Reference ${number}: ${note.dataset.title}${note.dataset.stamp ? ` at ${note.dataset.stamp}` : ""}`);
+    const box = panel.getBoundingClientRect();
+    const away = !wide.matches || box.top < 0 || box.top >= innerHeight;
+    if (back && origin.id) {
+      back.href = `#${origin.id}`;
+      back.textContent = `Back to reference ${number}`;
+      back.hidden = !away;
+    }
+    for (const a of marks) a.toggleAttribute("data-reference-selected", a === origin);
+    if (away) {
+      panel.scrollIntoView({ block: "start" });
+      panel.focus({ preventScroll: true });
+    }
+  };
+  for (const a of marks) {
+    a.addEventListener("click", (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       e.preventDefault();
-      start(shown);
+      activate(noteOf(a), a);
     });
   }
+  back?.addEventListener("click", (e) => {
+    if (!returnTo || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    stop();
+    root.removeAttribute("data-evidence-selected");
+    back.hidden = true;
+    preview(shown);
+    panel.setAttribute("aria-label", "Cited source");
+    for (const a of marks) a.removeAttribute("data-reference-selected");
+    const { mark, top } = returnTo;
+    scrollTo({ top: scrollY + mark.getBoundingClientRect().top - top });
+    mark.focus({ preventScroll: true });
+    returnTo = null;
+    schedule();
+  });
+  play?.addEventListener("click", (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || !shown.dataset.video) return;
+    e.preventDefault();
+    start(shown);
+  });
+  // While nothing plays, the panel follows the last footnote above the reading line.
   let ticking = false;
   const follow = () => {
     ticking = false;
-    if (!frame.offsetParent) return;
-    const line = innerHeight * 0.4;
+    if (!wide.matches || playing || root.hasAttribute("data-evidence-selected")) return;
+    const line = Math.min(innerHeight * 0.3, 240);
     let found = marks[0];
     for (const a of marks) if (a.getBoundingClientRect().top <= line) found = a;
-    show(noteOf(found));
+    const note = noteOf(found);
+    if (note !== shown) preview(note);
   };
-  addEventListener("scroll", () => {
-    if (!ticking) {
-      ticking = true;
-      requestAnimationFrame(follow);
-    }
-  }, { passive: true });
+  const schedule = () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(follow); }
+  };
+  addEventListener("scroll", schedule, { passive: true });
+  wide.addEventListener("change", () => {
+    if (back && returnTo) back.hidden = wide.matches;
+    schedule();
+  });
+  schedule();
 }
 
 /** On the home page: lighting what a topic or a video connects to. */
@@ -587,9 +617,10 @@ function sourceMoments() {
       rows[target].setAttribute("data-on", "");
       showMoment(moments[target]);
     }
-    // Into the read at that point, or the moment's own row when there's no read.
+    // A phone needs the selected video in view; wide screens can keep the read beside it.
     const part = [...parts].reverse().find((p) => Number(p.dataset.part) <= Number(at));
-    if (part) part.scrollIntoView({ block: "start" });
+    if (player && matchMedia("(max-width: 63.999rem)").matches) player.scrollIntoView({ block: "start" });
+    else if (part) part.scrollIntoView({ block: "start" });
     else if (target >= 0) {
       rows[target].closest("details")?.setAttribute("open", "");
       rows[target].scrollIntoView({ block: "center" });

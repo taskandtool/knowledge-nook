@@ -12,8 +12,6 @@ import { niceDate, RelationMap, Timeline, TopicMap } from "./viz";
 
 export type Built = { meta: Meta; body: Child };
 const TITLES: Record<PageType, string> = { topic: "Topics", guide: "Guides", speaker: "Speakers", channel: "Channels" };
-/** The small row of videos under a title; the section at the end lists them all. */
-const THUMBS_SHOWN = 5;
 const NEARBY_SHOWN = 6;
 /** Fewer written topics than this make a map of nothing. */
 const MAP_MIN = 3;
@@ -38,9 +36,9 @@ const LABEL: Record<PageType, string> = { topic: "Topic", guide: "Guide", speake
 
 const Frame = ({ children }: { children?: Child }) => <div class="mx-auto max-w-wide px-4 pt-10 sm:px-8 sm:pt-14">{children}</div>;
 const Heading = ({ title, lede }: { title: string; lede?: string }) => (
-  <header class="max-w-read">
-    <h1 class={`font-extrabold tracking-tight ${title.length > 60 ? "text-title sm:text-[2.25rem] sm:leading-[1.12]" : "text-page"}`}>{title}</h1>
-    {lede ? <p class="mt-4 text-lede text-ink-2">{lede}</p> : null}
+  <header class="max-w-heading">
+    <h1 class={`font-extrabold tracking-tight ${title.length > 60 ? "text-page-long" : "text-page"}`}>{title}</h1>
+    {lede ? <p class="mt-5 max-w-intro text-lede text-ink-2">{lede}</p> : null}
   </header>
 );
 export const videoOf = (s: Source) => { const id = videoId(s.url); return id && /^[\w-]+$/.test(id) ? id : undefined; };
@@ -114,8 +112,27 @@ const LinkList = ({ title, pages }: { title: string; pages: Page[] }) =>
   ) : null;
 
 /** The topics nearest this one, as posters: the first large when there are enough to fill around it. */
-const RelatedTiles = ({ site, pages, id = "nearby", title = "Related topics", wide }: { site: Site; pages: Page[]; id?: string; title?: string; wide?: boolean }) => {
+const RelatedTiles = ({ site, pages, id = "nearby", title = "Related topics", wide, reading }: { site: Site; pages: Page[]; id?: string; title?: string; wide?: boolean; reading?: boolean }) => {
   const pictureOf = pictureSpreader(site);
+  if (reading) return (
+    <section class="mt-14" aria-labelledby={id}>
+      <h2 id={id} class="text-title font-semibold">{title}</h2>
+      <div class="mt-5 border-t border-line">
+        {pages.map((t) => {
+          const picture = pictureOf(t);
+          return (
+            <a class="group flex items-center gap-4 border-b border-line py-5 no-underline" href={href(t.path)}>
+              <span class="min-w-0 flex-1">
+                <span class="block font-display text-copy leading-snug font-semibold [overflow-wrap:anywhere] group-hover:underline">{t.title}</span>
+                {t.description ? <span class="mt-1.5 line-clamp-2 font-body text-preview text-ink-2">{t.description}</span> : null}
+              </span>
+              {picture ? <img class="aspect-video w-20 shrink-0 rounded-tile object-cover" src={picture} alt="" loading="lazy" referrerpolicy="no-referrer" /> : null}
+            </a>
+          );
+        })}
+      </div>
+    </section>
+  );
   const lead = pages.length === NEARBY_SHOWN;
   return (
     <section class="mt-14 font-display" aria-labelledby={id}>
@@ -144,7 +161,7 @@ function referenceFinder(site: Site) {
     if (!s) return null;
     const at = secondsIn(url);
     const near = at === null ? undefined : [...s.moments].filter((m) => Math.abs(m.at - at) <= 180).sort((a, b) => Math.abs(a.at - at) - Math.abs(b.at - at))[0];
-    return { path: s.path, title: s.title, at, line: near?.text ?? "", video: videoOf(s), published: s.published, big: near?.punch ?? near?.text ?? "" };
+    return { path: s.path, title: s.title, at, line: near?.text ?? (videoOf(s) ? "" : s.gist), video: videoOf(s), published: s.published, big: near?.punch ?? near?.text ?? "" };
   };
 }
 
@@ -165,7 +182,7 @@ const WhereFrom = ({ list, site }: { list: Reference[]; site: Site }) => {
   const groups = citedSources(list);
   return list.length ? (
     <section class="mt-14 font-display" aria-labelledby="references" data-references>
-      <h2 id="references" class="text-title font-semibold">Where this comes from</h2>
+      <h2 id="references" class="text-title font-semibold">Sources</h2>
       <Timeline groups={groups} site={site} />
       <div class="mt-4 border-t border-line">
         {groups.map((g) => (
@@ -193,47 +210,32 @@ const WhereFrom = ({ list, site }: { list: Reference[]; site: Site }) => {
   ) : null;
 };
 
-/** Beside the writing: the video being cited where you're reading, and its line, large. The contents open in the line's place. */
+/** Beside the writing: the source cited where you're reading, and the section links. On a phone it opens only when a footnote is tapped. */
 function ReadingRail({ list, headings }: { list: Reference[]; headings: { text: string; id: string }[] }) {
-  const first = list.find((r) => r.video);
-  const contents = headings.length > 1 ? (
-    <nav aria-label="Sections" data-scrollspy>
-      <ul class="mt-2 max-h-[calc(86vh-27rem)] overflow-y-auto border-t border-line pt-1">{headings.map((h) => <li class="py-0.5"><a class="text-ink-2 no-underline hover:text-ink aria-[current=true]:font-semibold aria-[current=true]:text-ink" href={`#${h.id}`}>{h.text}</a></li>)}</ul>
-    </nav>
-  ) : null;
-  if (!first?.video) {
-    return (
-      <aside class="hidden font-display text-small lg:sticky lg:top-6 lg:block lg:self-start" aria-label="On this page" data-pagefind-ignore>
-        {contents ? <><h2 class="font-semibold text-ink-2">On this page</h2>{contents}</> : null}
-      </aside>
-    );
-  }
-  const line = list.find((r) => r.video === first.video && r.big) ?? first;
+  const first = list.find((r) => r.video) ?? list[0];
+  if (!first && headings.length < 2) return null;
   return (
-    <aside class="hidden font-display lg:sticky lg:top-6 lg:flex lg:h-[calc(100vh-9.5rem)] lg:min-h-[28rem] lg:flex-col lg:self-start lg:overflow-y-auto" aria-label="Video and contents" data-pagefind-ignore>
-      <div class="relative aspect-video w-full shrink-0 overflow-hidden bg-panel" data-rail-frame>
-        <a class="group block h-full w-full" href={citedAt(first)} aria-label={`Play ${first.title}`} data-rail-play>
-          <img class="h-full w-full object-cover" src={thumbOf(first.video)} alt="" referrerpolicy="no-referrer" data-rail-thumb />
-          <span class="absolute top-1/2 left-1/2 grid size-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-ink/70 text-surface transition-colors group-hover:bg-accent" aria-hidden="true">
-            <svg viewBox="0 0 24 24" class="ml-0.5 size-6" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-          </span>
-        </a>
-      </div>
-      <a class="mt-2 line-clamp-1 shrink-0 text-small text-ink-3 no-underline hover:text-ink hover:underline" href={href(first.path)} data-rail-title>{first.title}</a>
-      <div class="lg:pt-[clamp(2rem,calc(24vh-8rem),8rem)]">
-        <div class="relative text-small">
-          {first.at === null ? null : <a class="absolute top-0 right-0 font-mono text-ink-3 no-underline hover:text-accent hover:underline" href={citedAt(first)} data-rail-time data-swap-hide>{clock(first.at)}</a>}
-          {contents ? (
-            <details data-swap>
-              <summary class="w-fit cursor-pointer list-none text-ink-2 hover:text-ink hover:underline [&::-webkit-details-marker]:hidden">On this page</summary>
-              {contents}
-            </details>
-          ) : null}
-          <figure class="mt-5" data-rail-now data-swap-hide>
-            <blockquote class="moment-big" data-rail-text>{line.big}</blockquote>
-          </figure>
-        </div>
-      </div>
+    <aside class="topic-rail font-display text-rail" aria-label="Sources and navigation" data-reading-rail data-pagefind-ignore>
+      {first ? (
+        <section id="topic-evidence" class="topic-evidence flex-none scroll-mt-4 overflow-hidden rounded-tile" role="region" tabindex={-1} aria-label="Cited source" data-evidence-panel data-evidence-current={first.n}>
+          <div id="topic-video" class="aspect-video overflow-hidden rounded-tile" hidden={!first.video} data-rail-frame>
+            {first.video ? (
+              <a class="group relative block h-full" href={citedAt(first)} aria-label={`Play ${first.title}`} data-rail-play>
+                <img class="size-full object-cover" src={thumbOf(first.video)} alt="" referrerpolicy="no-referrer" data-rail-thumb />
+                <span class="absolute inset-0 grid place-items-center bg-media-shade text-surface" aria-hidden="true"><svg class="size-11 rounded-full bg-tile p-2 transition-transform group-hover:scale-110" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg></span>
+              </a>
+            ) : null}
+          </div>
+          <a class="block truncate py-3.5 no-underline hover:underline" href={citedAt(first)} title={first.title} data-rail-title>{first.title}</a>
+          <p class="pb-4 font-body text-evidence" hidden={!!first.video} data-rail-now data-rail-text>{first.line || first.big}</p>
+          <a class="block w-fit py-1 text-small text-ink-2" href="#main" hidden data-rail-return>Back to reference</a>
+        </section>
+      ) : null}
+      {headings.length > 1 ? (
+        <nav class="hidden border-t border-line pt-3 text-small min-[52rem]:block" aria-label="Sections" data-rail-contents data-scrollspy>
+          <ul>{headings.map((h) => <li><a class="block py-1.5 text-ink-2 no-underline hover:text-ink hover:underline aria-[current=true]:text-ink aria-[current=true]:underline" href={`#${h.id}`}>{h.text}</a></li>)}</ul>
+        </nav>
+      ) : null}
     </aside>
   );
 }
@@ -244,52 +246,41 @@ export function articlePage(site: Site, p: Page): Built {
   const rendered = renderWithNotes(p.body, referenceFinder(site));
   // Only what a reader can open, the closest few.
   const nearby = p.type === "topic" ? [...new Set([...r.related, ...site.nearbyOf(slugOfTopic(p)).flatMap((n) => (n.page && n.page !== p ? [n.page] : []))])].slice(0, NEARBY_SHOWN) : [];
-  // Everything the page has, so the contents follow a reader to its end.
+  // Section links orient the reading; discovery cards stay at the article's end.
   const headings = [
     ...headingsOf(p.body),
-    ...(nearby.length >= 2 ? [{ text: "Related topics", id: "nearby" }] : []),
-    ...(rendered.references.length ? [{ text: "Where this comes from", id: "references" }] : []),
+    ...(rendered.references.length ? [{ text: "Sources", id: "references" }] : []),
   ];
+  const hasRail = rendered.references.length > 0 || headings.length > 1;
   const cited = citedSources(rendered.references);
   const channels = [...new Set(sources.map((s) => s.channel).filter(Boolean))];
   const speakers = [...new Set(sources.flatMap((s) => s.speakers))];
   const body = (
     <Frame>
-      <div class="grid gap-x-16 lg:grid-cols-[minmax(0,44rem)_1fr]">
-        <div class="min-w-0">
-        <article data-pagefind-body>
-          <meta data-pagefind-filter="type[content]" content={LABEL[p.type]} />
-          {p.topic ? <meta data-pagefind-filter="topic[content]" content={p.topic} /> : null}
-          {channels.map((c) => <meta data-pagefind-filter="channel[content]" content={c} />)}
-          {speakers.map((s) => <meta data-pagefind-filter="speaker[content]" content={s} />)}
+      <article class="topic-reading" data-has-rail={hasRail ? "" : undefined} data-pagefind-body>
+        <meta data-pagefind-filter="type[content]" content={LABEL[p.type]} />
+        {p.topic ? <meta data-pagefind-filter="topic[content]" content={p.topic} /> : null}
+        {channels.map((c) => <meta data-pagefind-filter="channel[content]" content={c} />)}
+        {speakers.map((s) => <meta data-pagefind-filter="speaker[content]" content={s} />)}
+        <div class="topic-heading">
           <Heading title={p.title} lede={p.description} />
-          {cited.some((g) => g.video) ? (
-            <div class="mt-5 flex flex-wrap gap-1.5 lg:hidden" data-pagefind-ignore>
-              {cited.filter((g) => g.video).slice(0, THUMBS_SHOWN).map((g) => <a href={href(g.path)} title={g.title} aria-label={g.title}><img class="aspect-video h-10 rounded bg-panel object-cover" src={smallOf(g.video as string)} alt="" loading="lazy" referrerpolicy="no-referrer" /></a>)}
-            </div>
-          ) : null}
-          {headings.length > 1 ? (
-            <details class="mt-6 border-y border-line py-3 font-display text-small lg:hidden" data-pagefind-ignore>
-              <summary class="w-fit cursor-pointer list-none text-ink-2 hover:text-ink [&::-webkit-details-marker]:hidden">On this page</summary>
-              <ul class="mt-2">{headings.map((h) => <li class="py-1"><a class="no-underline" href={`#${h.id}`}>{h.text}</a></li>)}</ul>
-            </details>
-          ) : null}
-          <div class="prose mt-8">{raw(rendered.html)}</div>
-        </article>
-      <div data-pagefind-ignore>
-        {nearby.length >= 2 ? <RelatedTiles site={site} pages={nearby} /> : null}
-        <WhereFrom list={rendered.references} site={site} />
-        <div class="mt-14 grid gap-x-10 font-display sm:grid-cols-2">
-          <LinkList title="Part of" pages={r.partOf} />
-          <LinkList title="In this topic" pages={r.parts} />
-          <LinkList title="Broader" pages={r.broader} />
-          <LinkList title="Narrower" pages={r.narrower} />
-          {nearby.length >= 2 ? null : <LinkList title="Related" pages={r.related} />}
         </div>
-      </div>
+        <div class="reading-column mt-8">
+          <div class="prose">{raw(rendered.html)}</div>
+          <div data-pagefind-ignore>
+            <WhereFrom list={rendered.references} site={site} />
+            {nearby.length ? <RelatedTiles site={site} pages={nearby} reading /> : null}
+            <div class="mt-14 grid gap-x-10 font-display sm:grid-cols-2">
+              <LinkList title="Part of" pages={r.partOf} />
+              <LinkList title="In this topic" pages={r.parts} />
+              <LinkList title="Broader" pages={r.broader} />
+              <LinkList title="Narrower" pages={r.narrower} />
+              {p.type === "topic" ? null : <LinkList title="Related" pages={r.related} />}
+            </div>
+          </div>
         </div>
         <ReadingRail list={rendered.references} headings={headings} />
-      </div>
+      </article>
     </Frame>
   );
   return {
@@ -404,26 +395,28 @@ export function sourcePage(site: Site, s: Source): Built {
     body: (
       <>
       <Frame>
-        <article class="grid gap-x-10 lg:grid-cols-[minmax(0,1fr)_26rem] lg:max-xl:pl-12 xl:max-[1399px]:pl-5" data-pagefind-body>
+        <article class="lg:max-xl:pl-12 xl:max-[1399px]:pl-5" data-pagefind-body>
           <meta data-pagefind-filter="type[content]" content="Source" />
           {s.channel ? <meta data-pagefind-filter="channel[content]" content={s.channel} /> : null}
           {s.speakers.map((n) => <meta data-pagefind-filter="speaker[content]" content={n} />)}
-          <header class="lg:col-start-1">
+          <div class="max-w-heading">
             <Heading title={s.title} />
             <p class="mt-4 font-display text-small text-ink-2">{[s.channel, s.published ? dated(site, s.published) : "", who ? `with ${who}` : ""].filter(Boolean).join(" · ")}</p>
-          </header>
-          <aside class="mt-8 font-display lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:flex lg:h-[calc(100vh-9.5rem)] lg:min-h-[28rem] lg:flex-col lg:self-start lg:overflow-y-auto" data-pagefind-ignore>
-            {id ? <iframe id="player" data-video={id} class="aspect-video w-full" loading="lazy" src={`https://www.youtube-nocookie.com/embed/${id}`} title={s.title} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" /> : url ? <p><a rel="noopener" href={url}>Read the original</a></p> : null}
-            {s.moments.length ? <MomentsRail source={s} url={url} /> : null}
-          </aside>
-          <div class="mt-8 min-w-0 lg:col-start-1 lg:row-start-2">
-              {s.gist ? <div class="font-body text-lede [&>p+p]:mt-4">{s.gist.split(/\n\s*\n/).map((p) => <p>{p}</p>)}</div> : null}
-              {s.read.length ? (
-                <section class="mt-12" aria-labelledby="read">
-                  <h2 id="read" class="text-title font-semibold">Read it</h2>
-                  <ReadParts source={s} url={url} />
-                </section>
-              ) : null}
+          </div>
+          <div class="reading-layout mt-8">
+            <aside class="font-display lg:sticky lg:top-6 lg:col-start-2 lg:row-start-1 lg:flex lg:h-[calc(100vh-9.5rem)] lg:min-h-[28rem] lg:flex-col lg:self-start lg:overflow-y-auto" data-pagefind-ignore>
+              {id ? <iframe id="player" data-video={id} class="aspect-video w-full" loading="lazy" src={`https://www.youtube-nocookie.com/embed/${id}`} title={s.title} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" /> : url ? <p><a rel="noopener" href={url}>Read the original</a></p> : null}
+              {s.moments.length ? <MomentsRail source={s} url={url} /> : null}
+            </aside>
+            <div class="reading-column mt-8 lg:col-start-1 lg:row-start-1 lg:mt-0">
+                {s.gist ? <div class="font-body text-lede [&>p+p]:mt-4">{s.gist.split(/\n\s*\n/).map((p) => <p>{p}</p>)}</div> : null}
+                {s.read.length ? (
+                  <section class="mt-12" aria-labelledby="read">
+                    <h2 id="read" class="text-title font-semibold">Read it</h2>
+                    <ReadParts source={s} url={url} />
+                  </section>
+                ) : null}
+            </div>
           </div>
         </article>
       </Frame>
@@ -845,11 +838,11 @@ export function newPage(site: Site): Built {
                     return (
                       <li class="timeline-entry">
                         <a href={href(e.path)} class="group grid grid-cols-1 items-center gap-x-5 gap-y-3 no-underline sm:grid-cols-[17rem_minmax(0,1fr)]">
-                          {video ? <img class="aspect-video w-full rounded-lg bg-panel object-cover" src={thumbOf(video)} alt="" loading="lazy" referrerpolicy="no-referrer" /> : <span class="tile !relative aspect-video w-full rounded-lg !p-3">{e.page && pictureOf(e.page) ? <img class="tile-picture" src={pictureOf(e.page)} alt="" loading="lazy" referrerpolicy="no-referrer" /> : null}<span class="tile-words w-full truncate !text-[0.9375rem]" title={e.title}>{e.title}</span></span>}
+                          {video ? <img class="aspect-video w-full rounded-lg bg-panel object-cover" src={thumbOf(video)} alt="" loading="lazy" referrerpolicy="no-referrer" /> : <span class="tile !relative aspect-video w-full rounded-lg !p-3">{e.page && pictureOf(e.page) ? <img class="tile-picture" src={pictureOf(e.page)} alt="" loading="lazy" referrerpolicy="no-referrer" /> : null}<span class="tile-words w-full !text-copy" title={e.title}>{e.title}</span></span>}
                           <span class="min-w-0">
                             <span class="block text-small text-ink-3">{e.kind}</span>
-                            {video ? <span class="mt-0.5 block truncate font-semibold group-hover:text-accent" title={e.title}>{e.title}</span> : null}
-                            {e.line ? <span class="mt-1 line-clamp-2 font-body text-small text-ink-2">{e.line}</span> : null}
+                            {video ? <span class="mt-1 block text-copy font-semibold group-hover:text-accent" title={e.title}>{e.title}</span> : null}
+                            {e.line ? <span class="mt-2 line-clamp-2 font-body text-preview text-ink-2">{e.line}</span> : null}
                           </span>
                         </a>
                       </li>

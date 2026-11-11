@@ -66,6 +66,10 @@ test("a citation becomes a small numbered note that goes to our source page at i
   assert.doesNotMatch(out, /Pit, Jan/, "the label no longer breaks the read");
   assert.doesNotMatch(out, /\(\s*<sup/, "nor do its brackets");
   assert.match(out, /<\/sup><sup class="fn"/);
+  const marks = parse(out).querySelectorAll("[data-fn]");
+  assert.equal(marks.length, 4);
+  assert.equal(new Set(marks.map((mark) => mark.id)).size, marks.length, "repeated numbers return to their own occurrence in the read");
+  assert.ok(marks.every((mark) => mark.id && mark.getAttribute("href") === `#fn-${mark.getAttribute("data-fn")}`), "return anchors preserve the no-script footnote links");
 });
 
 test("a link that isn't a known source stays an ordinary link, and only safe ones are links", () => {
@@ -149,7 +153,7 @@ test("the site builds from the working folders and passes its checks", () => {
   assert.match(topic, /id="fn-1"/);
   assert.match(topic, /data-to="\/sources\/aaaaaaaaaaa#t=60"/);
   assert.doesNotMatch(topic.split("<main")[1].split('id="timeline"')[0], /youtube\.com\/watch/, "the writing never leaves for YouTube");
-  assert.match(topic, /Where this comes from/);
+  assert.equal(parse(topic).querySelector("#references").textContent, "Sources");
   assert.doesNotMatch(topic, /Private section text/);
   assert.doesNotMatch(topic, /Notes that stay private/);
   assert.match(html(cwd, "sitemap.xml"), /<loc>https:\/\/pit\.example\/topics\/smoke<\/loc><lastmod>\d{4}-\d\d-\d\d<\/lastmod>/);
@@ -441,8 +445,11 @@ test("if a reader can see a topic they can open it: nothing unwritten shows anyw
   const near = fixture({ "content/topics/rubs.md": written("Rubs") });
   assert.equal(build(near).status, 0);
   const lone = html(near, "topics/smoke.html");
-  assert.doesNotMatch(lone, /id="nearby"/, "one neighbour is no grid");
-  assert.doesNotMatch(lone, /href="#nearby"/, "and the contents don't offer it");
+  const related = parse(lone).querySelector('section[aria-labelledby="nearby"]');
+  assert.equal(related.querySelectorAll("a").length, 1, "a single written neighbour gets the same readable row as a longer list");
+  assert.equal(related.querySelector("a").getAttribute("href"), "/topics/rubs");
+  assert.equal(related.querySelector(".tile"), null, "a single neighbour does not become a poster grid");
+  assert.equal(parse(lone).querySelector('[data-rail-contents] a[href="#nearby"]'), null, "related reading stays in the discovery section");
   assert.doesNotMatch(lone, />fire</, "an unwritten name never shows");
   assert.doesNotMatch(html(near, "topics.html"), /Not written yet|rubs,/i);
 });
@@ -552,12 +559,12 @@ test("the lines cross as little as they can, on rows that fit both sides", () =>
   assert.equal(relationLayout(40, 2, []).height, 40 * 56, "the taller side sets the height");
 });
 
-test("the contents list everything the page has", () => {
+test("the section links cover the article and its cited sources", () => {
   const cwd = fixture({ "content/topics/rubs.md": written("Rubs"), "content/topics/fire.md": written("Fire") });
   assert.equal(build(cwd).status, 0);
   const topic = html(cwd, "topics/smoke.html");
   assert.match(topic, /data-scrollspy/);
-  for (const id of ["fire", "nearby", "references"]) {
+  for (const id of ["fire", "references"]) {
     assert.match(topic, new RegExp(`href="#${id}"`), id);
     assert.match(topic, new RegExp(`id="${id}"`), id);
   }
@@ -587,15 +594,50 @@ test("a written page has one section for where it comes from: each video once, w
   assert.match(section, /https:\/\/i\.ytimg\.com\/vi\/aaaaaaaaaaa\/hqdefault\.jpg/);
 });
 
-test("beside the writing: a picture of the video being cited, a link that works with no script, and the contents in the line's place", () => {
+test("the topic keeps a source preview, independent contents and no player until it is requested", () => {
   const cwd = fixture({ "content/topics/rubs.md": written("Rubs"), "content/topics/fire.md": written("Fire") });
   assert.equal(build(cwd).status, 0);
   const rail = html(cwd, "topics/smoke.html").split("data-rail-frame")[1].split("</aside>")[0];
   assert.match(rail, /data-rail-play/);
   assert.match(rail, /href="\/sources\/aaaaaaaaaaa#t=60"/, "with no script it goes to our page, at that second");
   assert.doesNotMatch(rail, /<iframe/, "no player until it's asked for");
-  assert.match(rail, /data-swap/);
-  assert.match(rail, /On this page/);
+  assert.match(rail, /data-rail-contents/);
+  assert.ok(parse(html(cwd, "topics/smoke.html")).querySelector('nav[data-rail-contents][aria-label="Sections"]'));
+  assert.doesNotMatch(rail, /<summary|On this page/, "section links are not a disclosure control");
+  const root = parse(html(cwd, "topics/smoke.html"));
+  assert.ok(root.querySelector("[data-rail-now]").hasAttribute("hidden"), "an opening quote does not repeat the article");
+  assert.ok(root.querySelector("[data-rail-title]").getAttribute("href").endsWith("#t=60"), "the source title keeps the cited moment");
+});
+
+test("a written-only topic has the same evidence panel and a public excerpt without video controls", () => {
+  const excerpt = "Small fires stay steady when fuel and airflow are adjusted together.";
+  const cwd = fixture({
+    "raw/web/notes.example/pages/fire.md": '---\ntitle: Fire notes\nurl: https://notes.example/fire\n---\n\nNotes from the author.\n',
+    "distilled/web/notes.example/pages/fire.md": '---\ntitle: Fire notes\nsource: web\nurl: https://notes.example/fire\ntopics: [smoke]\n---\n\n## Fire | smoke\n\nA private working note.\n',
+    "moments/web/notes.example/pages/fire.md": `---\ntitle: Fire notes\nurl: https://notes.example/fire\n---\n\n## Gist\n\n${excerpt}\n`,
+    "content/topics/smoke.md": '---\ntype: topic\ntitle: Reading a fire\ntopic: smoke\ndescription: Fuel and airflow work together.\n---\n\nKeep the fire steady ([Fire notes](https://notes.example/fire)).\n\n## Airflow\n\nRead the evidence before adjusting it.\n',
+  });
+  assert.equal(build(cwd).status, 0);
+  const root = parse(html(cwd, "topics/smoke.html"));
+  assert.equal(root.querySelector("[data-rail-title]").textContent, "Fire notes");
+  assert.equal(root.querySelector("[data-rail-play]"), null);
+  assert.ok(root.querySelector("[data-rail-frame]").hasAttribute("hidden"));
+  assert.equal(root.querySelector("#fn-1 [data-note-line]").textContent, excerpt);
+  assert.equal(root.querySelector("[data-rail-title]").getAttribute("href"), "/sources/web-notes-example-pages-fire");
+  writeFileSync(join(cwd, "content/topics/smoke.md"), '---\ntype: topic\ntitle: Mixed evidence\ntopic: smoke\n---\n\nBegin with video ([Pit](https://www.youtube.com/watch?v=aaaaaaaaaaa&t=60s)).\n\n## Written evidence\n\nAdjust the air ([Fire notes](https://notes.example/fire)).\n');
+  assert.equal(build(cwd).status, 0);
+  const mixed = parse(html(cwd, "topics/smoke.html"));
+  assert.ok(!mixed.querySelector("[data-rail-frame]").hasAttribute("hidden"), "a cited video leads the panel");
+  assert.ok(mixed.querySelector("[data-rail-play]"), "so a written source cited later can hand back to it");
+});
+
+test("a topic without citations does not reserve an empty media column", () => {
+  const cwd = fixture({ "content/topics/smoke.md": '---\ntype: topic\ntitle: A short note\ntopic: smoke\n---\n\nA short public note.\n' });
+  assert.equal(build(cwd).status, 0);
+  const root = parse(html(cwd, "topics/smoke.html"));
+  assert.equal(root.querySelector("[data-has-rail]"), null);
+  assert.equal(root.querySelector("[data-reading-rail]"), null);
+  assert.equal(root.querySelector(".topic-provenance"), null);
 });
 
 test("each dot gets a date; close ones share two rows, and one that fits nowhere stays in the list below", () => {
@@ -604,6 +646,7 @@ test("each dot gets a date; close ones share two rows, and one that fits nowhere
   const edges = timelineMarks(["2026-06-24", "2026-08-04", "2026-08-09"]);
   assert.equal(edges[0].align, "start", "the first label stays inside the frame");
   assert.equal(edges[2].align, "end", "and so does the last");
+  assert.notEqual(edges[1].row, edges[2].row, "a label never runs into the last one, which reaches left");
   const close = timelineMarks(["2026-01-01", "2026-06-01", "2026-06-10", "2026-12-31"]);
   assert.notEqual(close[1].row, close[2].row, "close neighbours never share a row");
   assert.deepEqual(texts(["2024-01-01", "2026-01-01"]), ["Jan 2024", "Jan 2026"], "the year shows across years");

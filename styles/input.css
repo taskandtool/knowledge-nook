@@ -14,7 +14,7 @@
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
   /* A page's writing, from markdown. */
-  .prose { overflow-wrap: anywhere; }
+  .prose { max-width: var(--container-read); font-size: var(--text-reading); line-height: var(--text-reading--line-height); overflow-wrap: anywhere; }
   .prose > * + * { margin-top: 1.1em; }
   .prose h2 { font-size: var(--text-title); line-height: var(--text-title--line-height); font-weight: 650; margin-top: 2.2em; scroll-margin-top: 1rem; }
   .prose h3 { font-size: 1.2rem; line-height: 1.3; font-weight: 650; margin-top: 1.8em; }
@@ -26,14 +26,37 @@
   .prose table { width: 100%; font-size: var(--text-small); border-collapse: collapse; }
   .prose :is(th, td) { border-bottom: 1px solid var(--color-line); padding: 0.4em 0.6em 0.4em 0; text-align: left; vertical-align: top; }
 
+  /* Writing keeps a short measure; the title above it runs wider. */
+  .reading-column { min-width: 0; max-width: var(--container-read); }
+  .reading-layout { display: grid; column-gap: var(--spacing-reading-gap); }
+  @media (min-width: 64rem) {
+    .reading-layout { grid-template-columns: minmax(0, 1fr) clamp(17rem, 28vw, 22rem); }
+  }
+
+  /* A written page: title, then the text, with the source rail beside it on a wide screen.
+     On a phone the rail sits between title and text and opens only when a footnote is tapped. */
+  .topic-reading { display: grid; column-gap: var(--spacing-reading-gap); }
+  .topic-heading { grid-column: 1; grid-row: 1; min-width: 0; }
+  .topic-reading > .reading-column { grid-column: 1; grid-row: 3; }
+  .topic-rail { overflow-anchor: none; grid-column: 1; grid-row: 2; min-width: 0; }
+  .topic-rail[data-evidence-selected] { margin-top: 1.5rem; }
+  .topic-rail:not([data-evidence-selected]) .topic-evidence { display: none; }
+  @media (min-width: 52rem) {
+    .topic-reading[data-has-rail] { grid-template-columns: minmax(0, 1fr) clamp(14rem, 27vw, 22rem); }
+    .topic-reading > .reading-column { grid-row: 2; }
+    .topic-rail { display: flex; flex-direction: column; position: sticky; top: 1.5rem; grid-column: 2; grid-row: 1 / span 2; align-self: start; max-height: calc(100vh - 3rem); overflow-y: auto; scrollbar-width: thin; }
+    .topic-rail:not([data-evidence-selected]) .topic-evidence { display: block; }
+    .topic-rail[data-evidence-selected] { margin-top: 0; }
+  }
+
   /* A moment worth stopping on: beside the read, or between its parts on a phone. */
-  .moment-big { font-family: var(--font-display); font-size: clamp(1.5rem, 2.3vw, 1.9rem); line-height: 1.16; font-weight: 700; letter-spacing: -0.018em; text-wrap: balance; color: var(--color-ink); }
+  .moment-big { font-family: var(--font-display); font-size: var(--text-moment); line-height: var(--text-moment--line-height); font-weight: 700; letter-spacing: -0.018em; text-wrap: balance; color: var(--color-ink); }
   @media (prefers-reduced-motion: no-preference) {
-    [data-moment-now].changing, [data-rail-now].changing { animation: moment-in 260ms cubic-bezier(0.2, 0, 0, 1); }
-    [data-rail-thumb].changing { animation: thumb-in 220ms ease-out; }
+    .topic-rail[data-evidence-selected] .topic-evidence { animation: evidence-in 180ms ease-out; }
+    [data-moment-now].changing { animation: moment-in 260ms cubic-bezier(0.2, 0, 0, 1); }
   }
   @keyframes moment-in { from { opacity: 0; transform: translateY(6px); } }
-  @keyframes thumb-in { from { opacity: 0.25; } }
+  @keyframes evidence-in { from { opacity: 0.35; } }
 
   [data-part] { scroll-margin-top: 1.5rem; }
 
@@ -55,7 +78,10 @@
 
   /* A citation: a small number that reads past, and a card on hover or tap. */
   sup.fn { font-size: 0.7em; line-height: 0; font-family: var(--font-display); }
-  sup.fn a { padding: 0 0.1em; color: var(--color-accent); text-decoration: none; }
+  sup.fn a { position: relative; padding-inline: 0.1em; line-height: 1; color: var(--color-accent); text-decoration: none; }
+  sup.fn a::after { content: ""; position: absolute; top: 50%; left: 50%; width: max(100%, var(--spacing-reference-target)); height: var(--spacing-reference-target); transform: translate(-50%, -50%); }
+  sup.fn:has(+ sup.fn) a::after, sup.fn + sup.fn a::after { width: 100%; }
+  sup.fn a[data-reference-selected] { text-decoration: underline; }
   sup.fn a:hover { text-decoration: underline; }
   sup.fn + sup.fn::before { content: " "; }
   .fn-card { position: absolute; z-index: 40; width: min(22rem, calc(100vw - 2rem)); padding: 0.75rem 0.875rem; border: 1px solid var(--color-line); border-radius: 0.75rem; background: var(--color-surface); font-family: var(--font-display); font-size: var(--text-small); line-height: var(--text-small--line-height); box-shadow: 0 2px 6px rgb(21 25 28 / 0.08), 0 16px 40px -12px rgb(21 25 28 / 0.3); }
