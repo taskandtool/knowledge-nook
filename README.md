@@ -1,5 +1,7 @@
 # Knowledge Nook
 
+[![Deploy on Task & Tool](https://taskandtool.com/images/deploy-button.svg)](https://taskandtool.com/accounts/register?starter_app=knowledge-nook)
+
 A Task & Tool **Starter App**: turns YouTube channels and websites into a public knowledge
 site with no ads. A reader picks a topic and sees what the sources say about it, who said it,
 when, and how the thinking changed, with every point linked to the moment or page it came from.
