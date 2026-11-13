@@ -6,7 +6,7 @@ cover. You can click any point to hear it at the second it was said.
 
 [![Deploy on Task & Tool](https://taskandtool.com/images/deploy-button.svg)](https://taskandtool.com/accounts/register?starter_app=knowledge-nook)
 
-![A Knowledge Nook topic page beside the video it cites, and the chart joining each topic to the videos it draws on](https://taskandtool.com/images/starter-apps/knowledge-nook.webp)
+![A Knowledge Nook topic page, the video it cites, and the chart of topics and videos](https://taskandtool.com/images/starter-apps/knowledge-nook.webp)
 
 It's made to run on Task & Tool. On Task & Tool your AI agent gets a
 computer for this app. The agent reads the videos' captions there, writes
@@ -20,7 +20,8 @@ Click the button above, or pick Knowledge Nook when you create an app on
 [Task & Tool](https://taskandtool.com/starter-apps/knowledge-nook). Then
 paste a YouTube channel or a website into the chat.
 
-See it in use on the [Knowledge Nook page](https://taskandtool.com/starter-apps/knowledge-nook).
+See it in use on the [Knowledge Nook
+page](https://taskandtool.com/starter-apps/knowledge-nook).
 
 ## Features
 
@@ -86,14 +87,14 @@ One site can use several channels and websites.
 A video with no captions costs nothing. Captions often come late. The agent
 tries such a video again until it is 14 days old.
 
-### You see the cost before the agent spends
+### The cost before any work starts
 
 The agent lists a channel's videos first and tells you the count, the hours,
 the credits, the AI cost and the time. Then it reads about 20 videos from
 across the channel's history as a sample. You read a few, and the agent
 adjusts its rules before it reads the rest.
 
-### You can turn on scheduled updates
+### Scheduled updates
 
 Once you say yes, the agent adds the jobs that apply to your site. Site
 health needs the site's address in `SITE.md`.
@@ -142,7 +143,7 @@ agent does each AI step on one video or page. Each script has a `--help`.
 `npm test` runs the tests on the scripts and the site. They use stand-ins
 for ScrapeCreators and YouTube and cost nothing.
 
-### Visitors read plain HTML files from Cloudflare
+### Static pages on Cloudflare
 
 The agent builds the pages as plain HTML files before it publishes them.
 Cloudflare serves the files from servers near each visitor. The app's
@@ -155,8 +156,8 @@ site's address, the agent also draws a share picture for each written page.
 Task & Tool is the easiest place to run it: the agent has the YouTube and
 ScrapeCreators connections and the scheduled jobs it needs. You get:
 
-- Its own computer for the agent, and a dev address where your team sees the
-  site before it goes live
+- Its own computer for the agent
+- A dev address your team opens to see the site before it goes live
 - Publishing on your own domain with a free SSL certificate. Only your team
   sees production until you make it public.
 - Connections to YouTube, ScrapeCreators and other services. Task & Tool
