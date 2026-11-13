@@ -6,6 +6,8 @@ cover. You can click any point to hear it at the second it was said.
 
 [![Deploy on Task & Tool](https://taskandtool.com/images/deploy-button.svg)](https://taskandtool.com/accounts/register?starter_app=knowledge-nook)
 
+![A Knowledge Nook topic page beside the video it cites, and the chart joining each topic to the videos it draws on](https://taskandtool.com/images/starter-apps/knowledge-nook.webp)
+
 It's made to run on Task & Tool. On Task & Tool your AI agent gets a
 computer for this app. The agent reads the videos' captions there, writes
 the pages and checks the quotes against the transcripts. The site is built
@@ -18,6 +20,8 @@ Click the button above, or pick Knowledge Nook when you create an app on
 [Task & Tool](https://taskandtool.com/starter-apps/knowledge-nook). Then
 paste a YouTube channel or a website into the chat.
 
+See it in use on the [Knowledge Nook page](https://taskandtool.com/starter-apps/knowledge-nook).
+
 ## Features
 
 ### Topic pages from what your videos say
@@ -28,6 +32,8 @@ play the video from that second in the player beside the page. The agent
 keeps quotes to 30 words. It checks them against the transcript and fixes
 any it can't find there. Besides topics, the agent can write guides and
 speaker pages.
+
+![A topic page, Separate conviction from excitement, beside the video it cites](https://taskandtool.com/images/marketing/knowledge-nook-topic.webp)
 
 ### A fresh agent checks the pages against the transcripts
 
@@ -56,12 +62,16 @@ over a topic on the home page to highlight the videos about it. Once 3
 topics have pages, the topics page has a map of them. A topic gets a bigger
 box the more the sources say about it.
 
+![The topics chart. Options trading is lit up and linked to the five videos that cover it](https://taskandtool.com/images/marketing/knowledge-nook-chart.webp)
+
 ### Visitors can search the whole site
 
 Press ⌘K, or Ctrl K, on any page. Search results are grouped into topics,
 guides, speakers, channels, sources and highlights. The matching words are
 marked in the results. The search index is built with the site and needs no
 server.
+
+<img src="https://taskandtool.com/images/marketing/knowledge-nook-search.webp" width="420" alt="A search for nvidia that found topics and sources">
 
 ### Sources can be your channel, any public channel or a website
 
