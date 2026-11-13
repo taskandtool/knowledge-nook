@@ -389,7 +389,7 @@ export function sourcePage(site: Site, s: Source): Built {
   const shared = new Map<Source, number>();
   for (const p of pages) for (const o of p.sourceKeys.flatMap((k) => { const x = site.sources.get(k); return x ? [x] : []; })) if (o !== s) shared.set(o, (shared.get(o) ?? 0) + 1);
   const alike = [...shared.keys()].sort((a, b) => (shared.get(b) ?? 0) - (shared.get(a) ?? 0) || (b.published || "").localeCompare(a.published || "")).slice(0, ALIKE_SHOWN);
-  const description = shortened(s.gist.length >= 50 ? s.gist.replace(/\s+/g, " ") : `${s.title}${s.channel ? `, from ${s.channel}` : ""}: the highlights and pages on this site that draw on it.`);
+  const description = shortened(s.gist.length >= 50 ? s.gist.replace(/\s+/g, " ") : `${s.title}${s.channel ? ` by ${s.channel}` : ""}: highlights and the ${site.settings.name} pages written from it.`);
   return {
     meta: { path: s.path, title: s.title, description, image: id ? thumbOf(id) : undefined, noindex: !s.indexable, jsonLd: s.indexable && id ? [videoLd(site, s, id)] : [] },
     body: (
@@ -568,7 +568,7 @@ const TopicList = ({ site, pages }: { site: Site; pages: Page[] }) => {
 
 export function listPage(site: Site, type: PageType): Built {
   const pages = site.pages.filter((p) => p.type === type);
-  const meta = { path: `/${PLURAL[type]}`, title: TITLES[type], description: `${TITLES[type]} on ${site.settings.name} and the highlights behind them.`, noindex: !pages.some((p) => p.indexable) };
+  const meta = { path: `/${PLURAL[type]}`, title: TITLES[type], description: `${TITLES[type]} on ${site.settings.name}. Each is written from the highlights of its sources.`, noindex: !pages.some((p) => p.indexable) };
   if (type !== "topic") {
     return { meta, body: <Frame><Heading title={TITLES[type]} />{pages.length ? <PageRows site={site} pages={pages} /> : <p class="mt-8">Nothing here yet.</p>}</Frame> };
   }
@@ -610,7 +610,7 @@ function topicLine(t: TopicRow, sources: Source[], used: Set<string>) {
 
 export function homePage(site: Site): Built {
   const { name, about } = site.settings;
-  const description = about.length >= 50 ? about : `${name}: what the sources say on each subject, who said it and when. Points link to where they were said.`;
+  const description = about.length >= 50 ? about : `${name}: what the sources say on each subject, who said it and when. For recordings, you can play the moment each point was said.`;
   const written = [...site.topics.filter((t) => t.page)].sort((a, b) => b.sources - a.sources || b.moments - a.moments);
   const shown = [...site.sources.values()].filter((s) => s.citedBy.length || s.moments.length).sort((a, b) => (b.published || "").localeCompare(a.published || ""));
   const guides = site.pages.filter((p) => p.type === "guide").slice(0, 6);
@@ -797,7 +797,7 @@ export function homePage(site: Site): Built {
 }
 
 export function searchPage(site: Site): Built {
-  const script = `window.addEventListener("DOMContentLoaded",function(){if(!window.PagefindUI){document.getElementById("search").textContent="Search appears after the site is built.";return}var ui=new PagefindUI({element:"#search",showSubResults:true,showImages:false,resetStyles:false,processResult:function(r){var clean=function(u){return u.replace(/\.html(?=$|[#?])/,"")};r.url=clean(r.url);(r.sub_results||[]).forEach(function(s){s.url=clean(s.url)});return r}});var q=new URLSearchParams(location.search).get("q");if(q)ui.triggerSearch(q)});`;
+  const script = `window.addEventListener("DOMContentLoaded",function(){if(!window.PagefindUI){document.getElementById("search").textContent="Search is ready once the site is built.";return}var ui=new PagefindUI({element:"#search",showSubResults:true,showImages:false,resetStyles:false,processResult:function(r){var clean=function(u){return u.replace(/\.html(?=$|[#?])/,"")};r.url=clean(r.url);(r.sub_results||[]).forEach(function(s){s.url=clean(s.url)});return r}});var q=new URLSearchParams(location.search).get("q");if(q)ui.triggerSearch(q)});`;
   return {
     meta: {
       path: "/search", title: "Search", description: `Search everything on ${site.settings.name} by topic, speaker, channel and page type.`, noindex: true,

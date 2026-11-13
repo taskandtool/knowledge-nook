@@ -173,7 +173,7 @@ function palette() {
     const local = data ? matchLocal(data, query, scope) : [];
     if (local.length) show(mergeResults(local, []), query);
     if (!pagefind) {
-      if (!local.length) list.innerHTML = `<p class="palette-empty">Search appears after the site is built.</p>`;
+      if (!local.length) list.innerHTML = `<p class="palette-empty">Search is ready once the site is built.</p>`;
       return undefined;
     }
     pagefind.preload(query);
