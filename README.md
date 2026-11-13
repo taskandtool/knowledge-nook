@@ -95,9 +95,8 @@ health needs the site's address in `SITE.md`.
 | Site health | Every Monday | Checks production for broken links, SEO basics and sitemap drift |
 | Audit | The 1st of each month | Traces a sample of citations, merges pages that overlap, and finds topics with enough material but no page |
 
-The agent deploys new pages without asking only if you set `Automatic
-deploys: yes` in `SITE.md`. Otherwise it posts a note in the activity log.
-You ask for the deploy in chat.
+The agent tells you when new pages are ready. You ask it to publish them in
+the chat.
 
 ### Checks before every deploy
 
@@ -130,7 +129,7 @@ repo has 8:
 
 The agent uses scripts for the steps that need no AI. A fresh run of the
 agent does each AI step on one video or page. Each script has a `--help`.
-`npm test` runs 235 tests on the scripts and the site. They use stand-ins
+`npm test` runs the tests on the scripts and the site. They use stand-ins
 for ScrapeCreators and YouTube and cost nothing.
 
 ### Visitors read plain HTML files from Cloudflare
