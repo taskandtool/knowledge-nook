@@ -441,7 +441,7 @@ export function sourcePage(site: Site, s: Source): Built {
 /** Every source with a page, newest first, each with the start of its gist. */
 export function sourcesPage(site: Site): Built {
   const list = [...site.sources.values()].filter((s) => s.citedBy.length || s.moments.length).sort((a, b) => (b.published || "").localeCompare(a.published || ""));
-  const description = `Every video and page ${site.settings.name} has read, each with its gist and strongest highlights.`;
+  const description = `The gist and strongest highlights of every video and page on ${site.settings.name}.`;
   const channels = [...new Set(list.map((s) => s.channel).filter(Boolean))];
   const [lead, ...rest] = list;
   const leadVideo = lead && videoOf(lead);
@@ -568,7 +568,7 @@ const TopicList = ({ site, pages }: { site: Site; pages: Page[] }) => {
 
 export function listPage(site: Site, type: PageType): Built {
   const pages = site.pages.filter((p) => p.type === type);
-  const meta = { path: `/${PLURAL[type]}`, title: TITLES[type], description: `${TITLES[type]} on ${site.settings.name}, each linked to the highlights it draws on.`, noindex: !pages.some((p) => p.indexable) };
+  const meta = { path: `/${PLURAL[type]}`, title: TITLES[type], description: `${TITLES[type]} on ${site.settings.name} and the highlights behind them.`, noindex: !pages.some((p) => p.indexable) };
   if (type !== "topic") {
     return { meta, body: <Frame><Heading title={TITLES[type]} />{pages.length ? <PageRows site={site} pages={pages} /> : <p class="mt-8">Nothing here yet.</p>}</Frame> };
   }
@@ -610,7 +610,7 @@ function topicLine(t: TopicRow, sources: Source[], used: Set<string>) {
 
 export function homePage(site: Site): Built {
   const { name, about } = site.settings;
-  const description = about.length >= 50 ? about : `${name}: what the sources say on each subject, who said it and when, with every point linked to where it was said.`;
+  const description = about.length >= 50 ? about : `${name}: what the sources say on each subject, who said it and when. Points link to where they were said.`;
   const written = [...site.topics.filter((t) => t.page)].sort((a, b) => b.sources - a.sources || b.moments - a.moments);
   const shown = [...site.sources.values()].filter((s) => s.citedBy.length || s.moments.length).sort((a, b) => (b.published || "").localeCompare(a.published || ""));
   const guides = site.pages.filter((p) => p.type === "guide").slice(0, 6);

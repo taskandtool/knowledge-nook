@@ -24,7 +24,7 @@ Agree with the owner, and record:
 
 ### 2. List and estimate
 
-`sources.mjs list` lists every video and page without fetching any transcripts, and `--since`, `--min-minutes` and `--language` record what to leave out. Tell the
+`sources.mjs list` lists every video and page without fetching any transcripts. `--since`, `--min-minutes` and `--language` record what to leave out. Tell the
 owner the number of sources, total hours, and the expected credits, AI cost and time.
 Wait for a yes.
 

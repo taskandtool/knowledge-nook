@@ -16,7 +16,7 @@ stop: each run costs a full turn.
    link more than 3 minutes from the claim. Correct the page's link. If the
    distillation is at fault, say which one and redo it with the `distill` skill. A pattern across pages
    means the `write-page` skill needs fixing: put that in the deliverable.
-2. **Overlap.** Pages drifting onto the same ground: each point lives on the most specific page where it
+2. **Overlap.** Pages drifting onto the same ground: each point goes on the most specific page where it
    is true, and a broader page keeps a short summary and a link.
 3. **Links.** Topics that belong together with no link. `Related:` in a topic file suggests them; you
    decide if the connection is real, and set `related`, `broader` or `part_of`.
