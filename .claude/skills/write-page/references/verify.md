@@ -7,11 +7,11 @@ Read `SITE.md` and the page. For each link in turn, open that source in `raw/` a
 read a few minutes around it; a raw file's name ends in the video's id. If the point isn't there, `grep` the
 whole transcript. Then correct the page in place, with the smallest edit:
 
-- **Each link opens on its claim.** Over about 3 minutes off, set `t=` to the second of the caption that says
+- **Each link opens on its claim.** If one is more than about 3 minutes off, set `t=` to the second of the caption that says
   it. Check neighbours for swapped links. A point with no link gets one, and a point from a second moment gets
   its own.
 - **Two sources merged.** "YouTube comments" from one talk's "YouTube" and another's "comments". Say what each said.
-- **Only the transcripts.** A rule, fact or doubt they never gave goes. So does commentary and attribution ("he argues", "his sharpest example"): teach the point straight.
+- **Only the transcripts.** Cut a rule, fact or doubt they never gave, and any commentary or attribution ("he argues", "his sharpest example"): teach the point straight.
 - **Clear.** A heading that's clever instead of saying its point gets rewritten.
 - **A quote with the wrong reason.** The words are exact, but the sentence around them gives another subject or cause. Say what they were talking about.
 - **What they actually meant.** A host's hypothetical or a voice they're putting on isn't their view. What they conceded stays what they conceded. Where they disagree, both views stay, and the page says they differ.

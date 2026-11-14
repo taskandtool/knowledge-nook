@@ -13,8 +13,8 @@ Read `SITE.md`, then `index/topics/<slug>.md`: every moment on this topic with i
 - **Nothing of yours.** No outside facts, no second-guessing, and no comment on how good an example is. Doubt only where your teachers give it: a caveat of theirs, or two of them conflicting.
 - **Where they disagree, say so.** Give each view with its reason and footnote; naming who holds it is optional. A view that changed over time gets both, dated.
 - **Weight by repetition.** A point they come back to across sources leads, told once with its strongest footnotes. It never gets more sentences.
-- **Each story once on the site.** A moment marked `Told on:` is that page's: here it gets a sentence and a link there. So does each narrower page `pipeline.mjs next` lists.
-- **Clear beats clever.** A reader who knows nothing follows every sentence. A heading says its point: "Stretch after you run, not before", never "The stretching myth".
+- **Each story once on the site.** A moment marked `Told on:` belongs to that page: here, give it one sentence and a link there. Do the same for each narrower page `pipeline.mjs next` lists.
+- **Be clear, not clever.** A reader who knows nothing follows every sentence. A heading says its point: "Stretch after you run, not before", never "The stretching myth".
 - **Keep it alive.** Their stories, numbers and jokes, told crisply. A name belongs in a story, never as a source: "A vending machine ate Ortiz's last dollar" is fine.
 - **As long as the material, no longer.** No restating, no sentence that only says why another matters, and nothing about the page itself.
 
@@ -24,7 +24,7 @@ Teaching: A bad night may give you a reason to quit, but the calling came before
 Pointer: The empty-nets story is told under [calling](/topics/calling/), where it belongs.
 Point: One empty night says little about [a calling](/topics/calling/): the disciples went out again in the morning.
 
-A footnote closes a point, to the moment's second: `[1](https://www.youtube.com/watch?v=abc&t=620s)`. Only a `Moment` line has a link to give, so a story found only in the notes stays out. Usually one or two a paragraph: sentences from one moment share one, and a figure or quote gets its own. Never one per sentence. The site turns these into footnotes.
+A footnote closes a point, to the moment's second: `[1](https://www.youtube.com/watch?v=abc&t=620s)`. Only a `Moment` line has a link to give; leave out a story found only in the notes. Usually one or two a paragraph: sentences from one moment share one, and a figure or quote gets its own. Never one per sentence. The site turns these into footnotes.
 
 ```markdown
 ---
